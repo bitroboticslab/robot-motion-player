@@ -112,21 +112,47 @@ motion_player metrics \
 
 ## Installation
 
-### pip (Linux/macOS/Windows)
+### Quick Install (Recommended)
+
+For most users, install via `pip`:
 
 ```bash
 # Core + MuJoCo
 pip install robot-motion-player[mujoco]
 
-# With optional dependencies
-pip install robot-motion-player[mujoco,gui,video]
+# With GUI support
+pip install robot-motion-player[mujoco,gui]
+
+# Full features (including IK)
+pip install robot-motion-player[all]
 ```
 
-### From Source
+### From Scripts (Linux, macOS, Windows)
+
+For a smoother setup experience, platform-specific scripts are provided:
+
+```bash
+# Linux
+chmod +x scripts/setup_linux.sh
+bash scripts/setup_linux.sh
+
+# macOS
+chmod +x scripts/setup_mac.sh
+bash scripts/setup_mac.sh
+
+# Windows
+scripts\setup_windows.bat
+```
+
+### From Source Manually (Linux, macOS, Windows)
 
 ```bash
 git clone https://github.com/bitroboticslab/robot-motion-player.git
 cd robot-motion-player
+conda create -n rmp python=3.11 -y
+conda activate rmp
+# recommended for windows to avoid compile from scratch
+conda install -c conda-forge pinocchio
 pip install -e ".[all]"
 ```
 
