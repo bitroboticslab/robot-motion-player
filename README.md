@@ -18,6 +18,7 @@
 Robot Motion Player is a standalone, cross-platform Python tool for visualizing, editing, and quality assessment of robot motion datasets. It supports AMP-format data and whole-body trajectory optimization results.
 
 **Key capabilities:**
+
 - 🎬 **Playback** — MuJoCo-first real-time motion playback
 - 🎚️ **IK Tuning** — 6D end-effector pose adjustment
 - 📊 **Metrics** — AMP-aligned quality evaluation
@@ -26,6 +27,7 @@ Robot Motion Player is a standalone, cross-platform Python tool for visualizing,
 - 📤 **Export** — GIF/Video output
 
 **Use cases:**
+
 - AMP locomotion learning pipeline (GMR → rsl-rl-ex → training)
 - Trajectory optimization visualization and debugging
 - Motion data quality control before expensive GPU training
@@ -70,49 +72,9 @@ Robot Motion Player is a standalone, cross-platform Python tool for visualizing,
 
 ---
 
-## Quick Start
-
-### Installation
-
-```bash
-# Core + MuJoCo
-pip install robot-motion-player[mujoco]
-
-# With GUI support
-pip install robot-motion-player[mujoco,gui]
-
-# All features
-pip install robot-motion-player[all]
-```
-
-### Try with Example Data
-
-```bash
-# Clone repository
-git clone https://github.com/bitroboticslab/robot-motion-player.git
-cd robot-motion-player
-
-# Basic playback
-motion_player play \
-  --motion example/standard_dataset/run1_subject5_standard.pkl \
-  --robot example/robots/booster_t1/T1_23dof.xml
-
-# GUI mode
-motion_player gui \
-  --motion example/standard_dataset/run1_subject5_standard.pkl \
-  --robot example/robots/booster_t1/T1_23dof.xml
-
-# Quality metrics
-motion_player metrics \
-  --motion example/standard_dataset/run1_subject5_standard.pkl \
-  --output report.json
-```
-
----
-
 ## Installation
 
-### Quick Install (Recommended)
+### Quick Install (Coming soon)
 
 For most users, install via `pip`:
 
@@ -154,6 +116,31 @@ conda activate rmp
 # recommended for windows to avoid compile from scratch
 conda install -c conda-forge pinocchio
 pip install -e ".[all]"
+```
+
+## Quick Start
+
+### Try with Example Data
+
+```bash
+# Clone repository
+git clone https://github.com/bitroboticslab/robot-motion-player.git
+cd robot-motion-player
+
+# Basic playback
+motion_player play \
+  --motion example/standard_dataset/run1_subject5_standard.pkl \
+  --robot example/robots/booster_t1/T1_23dof.xml
+
+# GUI mode
+motion_player gui \
+  --motion example/standard_dataset/run1_subject5_standard.pkl \
+  --robot example/robots/booster_t1/T1_23dof.xml
+
+# Quality metrics
+motion_player metrics \
+  --motion example/standard_dataset/run1_subject5_standard.pkl \
+  --output report.json
 ```
 
 ---
