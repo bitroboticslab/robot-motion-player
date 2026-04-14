@@ -1,13 +1,13 @@
 <div align="center">
   <img src="assets/banner.png" alt="Robot Motion Player" width="100%"/>
-  
+
   # Robot Motion Player
-  
+
   **Visualize • Tune • Validate Robot Motion Data**
-  
+
   [![License][license-badge]](LICENSE)
   [![Python][python-badge]](https://www.python.org/)
-  
+
   [English](README.md) | [中文](docs/QUICKSTART_zh.md)
 </div>
 
@@ -33,6 +33,29 @@ Robot Motion Player is a standalone, cross-platform Python tool for visualizing,
 
 ---
 
+## Demo
+
+<table>
+<tr>
+<td width="50%" align="center"><b>Playback + Control</b></td>
+<td width="50%" align="center"><b>IK Tuning</b></td>
+</tr>
+<tr>
+<td><img src="assets/demo/playback.gif" width="100%"></td>
+<td><img src="assets/demo/ik_tuning.gif" width="100%"></td>
+</tr>
+<tr>
+<td align="center"><b>Metrics Report</b></td>
+<td align="center"><b>GUI Workbench</b></td>
+</tr>
+<tr>
+<td><img src="assets/demo/metrics.gif" width="100%"></td>
+<td><img src="assets/demo/audit.gif" width="100%"></td>
+</tr>
+</table>
+
+---
+
 ## Features
 
 | Module | Features | Status |
@@ -49,21 +72,40 @@ Robot Motion Player is a standalone, cross-platform Python tool for visualizing,
 
 ## Quick Start
 
+### Installation
+
 ```bash
-# Install
+# Core + MuJoCo
 pip install robot-motion-player[mujoco]
 
-# Or with GUI support
+# With GUI support
 pip install robot-motion-player[mujoco,gui]
 
+# All features
+pip install robot-motion-player[all]
+```
+
+### Try with Example Data
+
+```bash
+# Clone repository
+git clone https://github.com/bitroboticslab/robot-motion-player.git
+cd robot-motion-player
+
 # Basic playback
-motion_player play --motion walk.pkl --robot robot.xml
+motion_player play \
+  --motion example/standard_dataset/run1_subject5_standard.pkl \
+  --robot example/robots/booster_t1/T1_23dof.xml
 
 # GUI mode
-motion_player gui --motion walk.pkl --robot robot.xml
+motion_player gui \
+  --motion example/standard_dataset/run1_subject5_standard.pkl \
+  --robot example/robots/booster_t1/T1_23dof.xml
 
 # Quality metrics
-motion_player metrics --motion walk.pkl --output report.json
+motion_player metrics \
+  --motion example/standard_dataset/run1_subject5_standard.pkl \
+  --output report.json
 ```
 
 ---
@@ -85,7 +127,7 @@ pip install robot-motion-player[mujoco,gui,video]
 ```bash
 git clone https://github.com/bitroboticslab/robot-motion-player.git
 cd robot-motion-player
-pip install -e ".[mujoco]"
+pip install -e ".[all]"
 ```
 
 ---
@@ -116,12 +158,18 @@ If you use Robot Motion Player in your research, please cite:
 
 ```bibtex
 @software{rmp2026,
-  author = {junhang and contributors},
+  author = {Lai, Junhang and contributors},
   title = {Robot Motion Player: A Visualizer and Editor for Robot Motion Data},
   howpublished = {https://github.com/bitroboticslab/robot-motion-player},
   year = {2026}
 }
 ```
+
+---
+
+## Contributing
+
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ---
 

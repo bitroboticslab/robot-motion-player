@@ -5,11 +5,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "robot-motion-player"
 version = "0.7.0"
-description = "Cross-platform AMP motion dataset visualiser and editor for legged robots"
+description = "Cross-platform robot motion data visualizer and editor for AMP datasets and trajectory optimization"
 readme = "README.md"
 license = { text = "Apache-2.0" }
 requires-python = ">=3.9"
-authors = [{ name = "Mr-tooth" }]
+authors = [{ name = "Junhang Lai", email = "junhang.lai@example.com" }]
+maintainers = [{ name = "Junhang Lai", email = "junhang.lai@example.com" }]
 keywords = [
     "robotics",
     "motion-player",
@@ -17,10 +18,13 @@ keywords = [
     "MuJoCo",
     "motion-retargeting",
     "legged-robots",
+    "trajectory-optimization",
+    "visualization",
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
@@ -29,6 +33,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Scientific/Engineering :: Visualization",
+    "Topic :: Scientific/Engineering :: Robotics",
 ]
 dependencies = [
     "numpy>=1.24",
@@ -42,14 +47,16 @@ mujoco = [
     "mujoco>=3.0",
 ]
 ik = [
-    "pin>=2.6",          # pinocchio Python bindings (conda: pinocchio)
+    "pin>=2.6",
 ]
-isaac = []               # Isaac SDK must be installed separately
 gui = [
     "dearpygui>=1.11",
 ]
 video = [
     "imageio>=2.34",
+]
+all = [
+    "robot-motion-player[mujoco,ik,gui,video]",
 ]
 dev = [
     "pytest>=7.0",
@@ -59,9 +66,11 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Mr-tooth/robot-motion-player"
-Issues = "https://github.com/Mr-tooth/robot-motion-player/issues"
-Documentation = "https://github.com/Mr-tooth/robot-motion-player/blob/main/docs/design.md"
+Homepage = "https://github.com/bitroboticslab/robot-motion-player"
+Documentation = "https://github.com/bitroboticslab/robot-motion-player#readme"
+Repository = "https://github.com/bitroboticslab/robot-motion-player.git"
+Issues = "https://github.com/bitroboticslab/robot-motion-player/issues"
+Changelog = "https://github.com/bitroboticslab/robot-motion-player/releases"
 
 [project.scripts]
 motion_player = "motion_player.cli.main:main"
@@ -69,6 +78,9 @@ motion_player = "motion_player.cli.main:main"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["motion_player*"]
+
+[tool.setuptools.package-data]
+motion_player = ["py.typed"]
 
 # ---------------------------------------------------------------------------
 # Ruff (linter + formatter)
