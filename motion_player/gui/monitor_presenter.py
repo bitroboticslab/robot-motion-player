@@ -36,7 +36,9 @@ def _on_off(value: bool) -> str:
 
 def build_monitor_view_model(snap: PlaybackSnapshot) -> MonitorViewModel:
     """Build a stable monitor view model from a playback snapshot."""
-    headline = f"Clip {snap.clip + 1}/{snap.total_clips}  Frame {snap.frame + 1}/{snap.total_frames}"
+    headline = (
+        f"Clip {snap.clip + 1}/{snap.total_clips}  Frame {snap.frame + 1}/{snap.total_frames}"
+    )
     subline = f"{'PLAY' if snap.playing else 'PAUSE'}  {snap.speed:.1f}x"
     flags_line = (
         f"LOOP {_on_off(snap.loop)}  "

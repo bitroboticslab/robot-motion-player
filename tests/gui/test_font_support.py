@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from motion_player.gui.font_support import resolve_cjk_font
+from pathlib import Path
+
+from motion_player.gui.font_support import resolve_cjk_font, resolve_ui_font
 
 
 def test_resolve_cjk_font_returns_first_existing(tmp_path) -> None:
@@ -17,3 +19,12 @@ def test_resolve_cjk_font_honors_env_override(tmp_path, monkeypatch) -> None:
     custom.write_bytes(b"font")
     monkeypatch.setenv("RMP_GUI_FONT", str(custom))
     assert resolve_cjk_font([]) == custom
+
+
+def test_resolve_ui_font_falls_back_when_cjk_missing(tmp_path: Path, monkeypatch) -> None:
+    latin = tmp_path / "DejaVuSans.ttf"
+    latin.write_bytes(b"font")
+    monkeypatch.delenv("RMP_GUI_FONT", raising=False)
+    found = resolve_ui_font(cjk_candidates=[], fallback_candidates=[latin])
+
+    assert found == latin

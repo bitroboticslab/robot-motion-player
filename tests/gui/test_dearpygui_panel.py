@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
+import motion_player.gui.dearpygui_panel as dearpygui_panel_module
 from motion_player.core.ui.state_monitor import PlaybackSnapshot
 from motion_player.gui.dearpygui_panel import DearPyGuiPanel
 from motion_player.gui.tabs import TAB_IDS
@@ -67,7 +68,9 @@ def test_panel_calls_controller_callbacks() -> None:
         def on_redo_edit(self) -> None:
             calls.append("redo")
 
-        def on_edit_dof_delta(self, joint_idx: int, delta: float, propagate_radius: int = 0) -> None:
+        def on_edit_dof_delta(
+            self, joint_idx: int, delta: float, propagate_radius: int = 0
+        ) -> None:
             calls.append(f"dof:{joint_idx}:{delta:.2f}:{propagate_radius}")
 
         def on_save_motion(self) -> None:
@@ -198,6 +201,237 @@ def test_every_interactive_control_has_tooltip_keys() -> None:
     assert missing == []
 
 
+def test_panel_exposes_status_dock_builder_for_consistent_bottom_layout() -> None:
+    class StubController:
+        pass
+
+    panel = DearPyGuiPanel(controller=StubController(), title="Test")
+    assert callable(panel._build_status_dock)
+
+
+def test_panel_viewport_resize_rebuilds_status_dock_and_monitor_layout() -> None:
+    calls: list[tuple[str, int | None]] = []
+
+    class StubController:
+        pass
+
+    panel = DearPyGuiPanel(controller=StubController(), title="Test")
+    panel._dpg = object()
+    panel._rebuild_status_dock = lambda width_hint=None: calls.append(("dock", width_hint))
+    panel._apply_monitor_card_layout = lambda width_hint=None: calls.append(("monitor", width_hint))
+
+    panel._on_viewport_resized_dpg((960, 540))
+
+    assert calls == [("dock", 960), ("monitor", 960)]
+
+
+def test_status_dock_output_menu_label_switches_with_language() -> None:
+    class StubController:
+        pass
+
+    panel = DearPyGuiPanel(controller=StubController(), title="Test")
+    assert panel._text("status_dock_output_menu") == "Output"
+    panel._set_language("zh")
+    assert panel._text("status_dock_output_menu") == "输出"
+
+
+def test_status_dock_rebuild_preserves_tool_state() -> None:
+    class StubController:
+        pass
+
+    class FakeDpg:
+        def __init__(self, panel: DearPyGuiPanel) -> None:
+            self.values: dict[str, object] = {
+                panel._tool_result_tag: "export: rc=0\nstdout:\nDone",
+                panel._tool_progress_bar_tag: 0.65,
+                panel._tool_progress_text_tag: "export: 13/20 frames",
+            }
+            self.deleted: list[str] = []
+            self.viewport_width = 920
+
+        def does_item_exist(self, tag: str) -> bool:
+            return tag in self.values or tag == panel._status_dock_container_tag
+
+        def get_value(self, tag: str) -> object:
+            return self.values[tag]
+
+        def set_value(self, tag: str, value: object) -> None:
+            self.values[tag] = value
+
+        def delete_item(self, tag: str) -> None:
+            self.deleted.append(tag)
+            self.values.pop(tag, None)
+
+        def get_viewport_client_width(self) -> int:
+            return self.viewport_width
+
+    panel = DearPyGuiPanel(controller=StubController(), title="Test")
+    fake_dpg = FakeDpg(panel)
+    panel._dpg = fake_dpg
+    panel._tool_progress_ratio = 0.65
+
+    def _fake_build_status_dock(
+        _dpg: object, window_width: int = 760, parent: str | None = None
+    ) -> None:
+        assert window_width == 920
+        assert parent == panel._status_dock_container_tag
+        fake_dpg.values[panel._tool_result_tag] = panel._text("tool_ready")
+        fake_dpg.values[panel._tool_progress_bar_tag] = 0.0
+        fake_dpg.values[panel._tool_progress_text_tag] = ""
+
+    panel._build_status_dock = _fake_build_status_dock
+
+    panel._rebuild_status_dock(width_hint=920)
+
+    assert fake_dpg.deleted == [panel._status_dock_tag]
+    assert fake_dpg.values[panel._tool_result_tag] == "export: rc=0\nstdout:\nDone"
+    assert fake_dpg.values[panel._tool_progress_bar_tag] == 0.65
+    assert fake_dpg.values[panel._tool_progress_text_tag] == "export: 13/20 frames"
+    assert panel._tool_progress_ratio == 0.65
+
+
+def test_status_dock_rebuild_passes_explicit_parent_container() -> None:
+    class StubController:
+        pass
+
+    class FakeDpg:
+        def __init__(self, panel: DearPyGuiPanel) -> None:
+            self.values: dict[str, object] = {
+                panel._tool_result_tag: "ready",
+                panel._tool_progress_bar_tag: 0.0,
+                panel._tool_progress_text_tag: "",
+            }
+            self.viewport_width = 900
+
+        def does_item_exist(self, tag: str) -> bool:
+            return tag in self.values or tag == panel._status_dock_container_tag
+
+        def get_value(self, tag: str) -> object:
+            return self.values[tag]
+
+        def set_value(self, tag: str, value: object) -> None:
+            self.values[tag] = value
+
+        def delete_item(self, tag: str) -> None:
+            self.values.pop(tag, None)
+
+        def get_viewport_client_width(self) -> int:
+            return self.viewport_width
+
+    panel = DearPyGuiPanel(controller=StubController(), title="Test")
+    fake_dpg = FakeDpg(panel)
+    panel._dpg = fake_dpg
+
+    called: dict[str, object] = {}
+
+    def _fake_build_status_dock(
+        _dpg: object, window_width: int = 760, parent: str | None = None
+    ) -> None:
+        called["window_width"] = window_width
+        called["parent"] = parent
+
+    panel._build_status_dock = _fake_build_status_dock
+
+    panel._rebuild_status_dock(width_hint=900)
+
+    assert called["window_width"] == 900
+    assert called["parent"] == panel._status_dock_container_tag
+
+
+def test_status_dock_rebuild_noops_when_container_missing() -> None:
+    class StubController:
+        pass
+
+    class FakeDpg:
+        def __init__(self, panel: DearPyGuiPanel) -> None:
+            self.values: dict[str, object] = {
+                panel._tool_result_tag: "ready",
+                panel._tool_progress_bar_tag: 0.0,
+                panel._tool_progress_text_tag: "",
+            }
+            self.viewport_width = 860
+
+        def does_item_exist(self, tag: str) -> bool:
+            return tag in self.values
+
+        def get_value(self, tag: str) -> object:
+            return self.values[tag]
+
+        def set_value(self, tag: str, value: object) -> None:
+            self.values[tag] = value
+
+        def delete_item(self, tag: str) -> None:
+            self.values.pop(tag, None)
+
+        def get_viewport_client_width(self) -> int:
+            return self.viewport_width
+
+    panel = DearPyGuiPanel(controller=StubController(), title="Test")
+    fake_dpg = FakeDpg(panel)
+    panel._dpg = fake_dpg
+
+    called = False
+
+    def _fake_build_status_dock(
+        _dpg: object, window_width: int = 760, parent: str | None = None
+    ) -> None:
+        nonlocal called
+        called = True
+
+    panel._build_status_dock = _fake_build_status_dock
+
+    panel._rebuild_status_dock(width_hint=860)
+
+    assert called is False
+
+
+def test_status_dock_rebuild_fail_open_when_build_raises() -> None:
+    class StubController:
+        pass
+
+    class FakeDpg:
+        def __init__(self, panel: DearPyGuiPanel) -> None:
+            self.values: dict[str, object] = {
+                panel._tool_result_tag: "export: rc=0",
+                panel._tool_progress_bar_tag: 0.5,
+                panel._tool_progress_text_tag: "export: running",
+            }
+            self.deleted: list[str] = []
+            self.viewport_width = 880
+
+        def does_item_exist(self, tag: str) -> bool:
+            return tag in self.values or tag == panel._status_dock_container_tag
+
+        def get_value(self, tag: str) -> object:
+            return self.values[tag]
+
+        def set_value(self, tag: str, value: object) -> None:
+            self.values[tag] = value
+
+        def delete_item(self, tag: str) -> None:
+            self.deleted.append(tag)
+            self.values.pop(tag, None)
+
+        def get_viewport_client_width(self) -> int:
+            return self.viewport_width
+
+    panel = DearPyGuiPanel(controller=StubController(), title="Test")
+    fake_dpg = FakeDpg(panel)
+    panel._dpg = fake_dpg
+
+    def _fake_build_status_dock(
+        _dpg: object, window_width: int = 760, parent: str | None = None
+    ) -> None:
+        raise RuntimeError("status dock build failure")
+
+    panel._build_status_dock = _fake_build_status_dock
+
+    panel._rebuild_status_dock(width_hint=880)
+
+    assert fake_dpg.deleted == [panel._status_dock_tag]
+    assert panel._tool_progress_ratio == 0.5
+
+
 def test_panel_language_switch_changes_tooltip_translation() -> None:
     class StubController:
         pass
@@ -237,7 +471,11 @@ def test_tune_state_defaults_from_snapshot_selected_joint_pose() -> None:
 
     pos = panel._tune_state.display_position()
     assert tuple(round(float(v), 6) for v in pos) == (0.4, 0.1, 0.9)
-    assert tuple(round(float(v), 6) for v in panel._tune_state.current_position_m) == (0.4, 0.1, 0.9)
+    assert tuple(round(float(v), 6) for v in panel._tune_state.current_position_m) == (
+        0.4,
+        0.1,
+        0.9,
+    )
     assert panel._tune_state.target_joint == "joint_0"
 
 
@@ -258,6 +496,649 @@ def test_tune_i18n_includes_reference_frame_and_pose_sections() -> None:
     assert "Reference Frame" in panel._text("ik_reference_frame")
     assert "Current Pose" in panel._text("ik_current_pose")
     assert "Target Pose" in panel._text("ik_target_pose")
+
+
+def test_font_size_option_mapping_supports_en_and_zh_labels() -> None:
+    class StubController:
+        pass
+
+    panel = DearPyGuiPanel(controller=StubController(), title="Test")
+    en_items = panel._font_size_items()
+    assert "Medium (18)" in en_items
+
+    panel._set_language("zh")
+    zh_items = panel._font_size_items()
+    assert "中 (18)" in zh_items
+
+    assert panel._font_size_key_from_label("Large (22)") == "large"
+    assert panel._font_size_key_from_label("大 (22)") == "large"
+
+
+def test_font_size_changed_binds_selected_font_when_available() -> None:
+    class StubController:
+        pass
+
+    class FakeDpg:
+        def __init__(self) -> None:
+            self.bound = None
+
+        def bind_font(self, font: int) -> None:
+            self.bound = font
+
+    panel = DearPyGuiPanel(controller=StubController(), title="Test")
+    panel._dpg = FakeDpg()
+    panel._font_handles = {"medium": 101, "large": 202}
+
+    panel._on_font_size_changed("Large (22)")
+    panel._process_font_intents()
+
+    assert panel._font_size_key == "large"
+    assert panel._dpg.bound == 202
+
+
+def test_font_size_changed_accepts_index_like_payload() -> None:
+    class StubController:
+        pass
+
+    class FakeDpg:
+        def __init__(self) -> None:
+            self.bound = None
+
+        def bind_font(self, font: int) -> None:
+            self.bound = font
+
+    panel = DearPyGuiPanel(controller=StubController(), title="Test")
+    panel._dpg = FakeDpg()
+    panel._font_handles = {"medium": 101, "large": 202}
+
+    panel._on_font_size_changed(2)
+    panel._process_font_intents()
+
+    assert panel._font_size_key == "large"
+    assert panel._dpg.bound == 202
+
+
+def test_font_size_changed_ignores_invalid_payload_without_polling_combo_value() -> None:
+    class StubController:
+        pass
+
+    class FakeDpg:
+        def __init__(self) -> None:
+            self.bound = None
+            self.values: dict[str, object] = {}
+
+        def bind_font(self, font: int) -> None:
+            self.bound = font
+
+        def get_value(self, _tag: str) -> object:
+            raise AssertionError("get_value should not be called")
+
+        def set_value(self, tag: str, value: object) -> None:
+            self.values[tag] = value
+
+    panel = DearPyGuiPanel(controller=StubController(), title="Test")
+    panel._dpg = FakeDpg()
+    panel._font_handles = {"medium": 101, "large": 202}
+
+    panel._on_font_size_changed({"selected": "??"})
+
+    assert not panel._font_intents
+    assert panel._font_size_key == "medium"
+    assert panel._dpg.bound is None
+    assert panel._dpg.values[panel._status_text_tag] == "Font selection ignored: invalid payload."
+
+
+def test_font_size_changed_uses_payload_key_even_if_combo_value_is_stale() -> None:
+    class StubController:
+        pass
+
+    class FakeDpg:
+        def __init__(self) -> None:
+            self.bound = None
+
+        def bind_font(self, font: int) -> None:
+            self.bound = font
+
+        def get_value(self, _tag: str) -> object:
+            raise AssertionError("get_value should not be called")
+
+    panel = DearPyGuiPanel(controller=StubController(), title="Test")
+    panel._dpg = FakeDpg()
+    panel._font_handles = {"small": 101, "large": 202}
+    panel._font_size_key = "small"
+    panel._applied_font_size_key = "small"
+
+    panel._on_font_size_changed("Large (22)")
+    panel._process_font_intents()
+
+    assert panel._font_size_key == "large"
+    assert panel._applied_font_size_key == "large"
+    assert panel._dpg.bound == 202
+
+
+def test_font_size_callback_increase_not_reverted_by_stale_combo_display() -> None:
+    class StubController:
+        pass
+
+    class FakeDpg:
+        def __init__(self) -> None:
+            self.bound: list[int] = []
+            self.combo_value = "Small (14)"
+            self.values: dict[str, object] = {}
+
+        def get_value(self, tag: str) -> object:
+            assert tag == panel._font_size_combo_tag
+            return self.combo_value
+
+        def set_value(self, tag: str, value: object) -> None:
+            self.values[tag] = value
+            if tag == panel._font_size_combo_tag:
+                self.combo_value = str(value)
+
+        def bind_font(self, font: int) -> None:
+            self.bound.append(font)
+
+    panel = DearPyGuiPanel(controller=StubController(), title="Test")
+    panel._dpg = FakeDpg()
+    panel._font_handles = {"small": 11, "medium": 22}
+    panel._font_size_key = "small"
+    panel._font_requested_key = "small"
+    panel._applied_font_size_key = "small"
+
+    panel._on_font_size_changed("Medium (18)")
+    panel._process_font_intents()
+    assert panel._font_size_key == "medium"
+
+    panel._dpg.combo_value = "Small (14)"
+    panel._reconcile_font_size_combo_display()
+
+    assert panel._font_size_key == "medium"
+    assert panel._applied_font_size_key == "medium"
+
+
+def test_value_callback_enqueues_command_until_ui_bus_drained() -> None:
+    panel = DearPyGuiPanel(controller=type("Stub", (), {})(), title="Test")
+    seen: list[object] = []
+    cb = panel._make_dpg_value_callback(lambda value: seen.append(value))
+
+    cb("sender", "Medium (18)", None)
+
+    assert seen == []
+    assert len(panel._ui_commands) == 1
+    panel._drain_ui_commands()
+    assert seen == ["Medium (18)"]
+
+
+def test_queued_font_event_applies_upward_after_ui_bus_drain() -> None:
+    class FakeDpg:
+        def bind_font(self, _font: int) -> None:
+            return None
+
+    panel = DearPyGuiPanel(controller=type("Stub", (), {})(), title="Test")
+    panel._dpg = FakeDpg()
+    panel._font_handles = {"small": 11, "medium": 22}
+    panel._font_size_key = "small"
+    panel._applied_font_size_key = "small"
+
+    cb = panel._make_dpg_value_callback(panel._on_font_size_changed)
+    cb("sender", "Medium (18)", None)
+    panel._drain_ui_commands()
+    panel._process_font_intents()
+
+    assert panel._font_size_key == "medium"
+
+
+def test_font_size_unparseable_callback_does_not_poison_future_upscale() -> None:
+    class StubController:
+        pass
+
+    class FakeDpg:
+        def __init__(self) -> None:
+            self.bound: list[int] = []
+            self.values: dict[str, object] = {}
+
+        def bind_font(self, font: int) -> None:
+            self.bound.append(font)
+
+        def set_value(self, tag: str, value: object) -> None:
+            self.values[tag] = value
+
+    panel = DearPyGuiPanel(controller=StubController(), title="Test")
+    panel._dpg = FakeDpg()
+    panel._font_handles = {"small": 11, "medium": 22}
+    panel._font_size_key = "small"
+    panel._applied_font_size_key = "small"
+
+    panel._on_font_size_changed({"opaque": "payload"})
+    assert panel._font_size_key == "small"
+
+    panel._on_font_size_changed("Medium (18)")
+    panel._process_font_intents()
+
+    assert panel._font_size_key == "medium"
+    assert panel._applied_font_size_key == "medium"
+    assert panel._dpg.bound == [22]
+
+
+def test_font_intent_stale_ack_does_not_revert_latest_applied_font() -> None:
+    class FakeDpg:
+        def __init__(self) -> None:
+            self.bound: list[int] = []
+
+        def bind_font(self, font: int) -> None:
+            self.bound.append(font)
+
+    panel = DearPyGuiPanel(controller=type("Stub", (), {})(), title="Test")
+    panel._dpg = FakeDpg()
+    panel._font_handles = {"small": 11, "medium": 22, "large": 33}
+    panel._font_size_key = "small"
+    panel._applied_font_size_key = "small"
+    panel._enqueue_font_intent("medium")
+    panel._process_font_intents()
+    panel._enqueue_font_intent("large")
+    panel._process_font_intents()
+    panel._ack_font_apply(intent_id=1, applied_key="medium")
+    assert panel._font_size_key == "large"
+    assert panel._applied_font_size_key == "large"
+
+
+def test_stale_failure_ack_does_not_block_later_upward_font_event() -> None:
+    class FakeDpg:
+        def __init__(self) -> None:
+            self.bound: list[int] = []
+            self.values: dict[str, object] = {}
+
+        def bind_font(self, font: int) -> None:
+            self.bound.append(font)
+
+        def set_value(self, tag: str, value: object) -> None:
+            self.values[tag] = value
+
+    panel = DearPyGuiPanel(controller=type("Stub", (), {})(), title="Test")
+    panel._dpg = FakeDpg()
+    panel._font_handles = {"small": 11, "medium": 22, "large": 33}
+    panel._font_size_key = "small"
+    panel._font_requested_key = "small"
+    panel._applied_font_size_key = "small"
+
+    panel._on_font_size_changed("Medium (18)")
+    panel._process_font_intents()
+
+    panel._ack_font_apply(intent_id=999, applied_key="small", ok=False, reason="stale")
+
+    assert panel._font_size_key == "medium"
+    assert panel._applied_font_size_key == "medium"
+    assert panel._dpg.bound == [22]
+
+    panel._on_font_size_changed("Large (22)")
+    panel._process_font_intents()
+
+    assert panel._font_size_key == "large"
+    assert panel._applied_font_size_key == "large"
+    assert panel._dpg.bound == [22, 33]
+    assert panel._last_font_status_message != "Font apply failed for 'small': stale"
+
+
+def test_font_intent_queue_latest_wins() -> None:
+    panel = DearPyGuiPanel(controller=type("Stub", (), {})(), title="Test")
+    panel._enqueue_font_intent("medium")
+    panel._enqueue_font_intent("large")
+
+    assert len(panel._font_intents) == 1
+    assert next(iter(panel._font_intents)).target_key == "large"
+    assert panel._font_requested_key == "large"
+
+
+def test_font_apply_failure_preserves_latest_requested_key_when_pending() -> None:
+    class FakeDpg:
+        def __init__(self) -> None:
+            self.values: dict[str, object] = {}
+
+        def set_value(self, tag: str, value: object) -> None:
+            self.values[tag] = value
+
+    panel = DearPyGuiPanel(controller=type("Stub", (), {})(), title="Test")
+    panel._dpg = FakeDpg()
+    panel._font_handles = {"small": 11, "medium": 22, "large": 33}
+    panel._font_size_key = "small"
+    panel._font_requested_key = "small"
+    panel._applied_font_size_key = "small"
+
+    panel._enqueue_font_intent("medium")
+    intent = panel._font_intents.popleft()
+    panel._font_inflight_intent_id = intent.intent_id
+
+    panel._enqueue_font_intent("large")
+    panel._ack_font_apply(
+        intent_id=intent.intent_id,
+        applied_key=intent.target_key,
+        ok=False,
+        reason="simulated bind failure",
+    )
+
+    assert panel._font_size_key == "small"
+    assert panel._applied_font_size_key == "small"
+    assert panel._font_requested_key == "large"
+    assert (
+        panel._dpg.values[panel._status_text_tag]
+        == "Font apply failed for 'medium': simulated bind failure"
+    )
+    assert panel._font_size_combo_tag not in panel._dpg.values
+
+
+def test_font_apply_success_preserves_latest_requested_key_when_pending() -> None:
+    class FakeDpg:
+        def __init__(self) -> None:
+            self.bound: list[int] = []
+
+        def bind_font(self, font: int) -> None:
+            self.bound.append(font)
+
+    panel = DearPyGuiPanel(controller=type("Stub", (), {})(), title="Test")
+    panel._dpg = FakeDpg()
+    panel._font_handles = {"small": 11, "medium": 22, "large": 33}
+    panel._font_size_key = "small"
+    panel._font_requested_key = "small"
+    panel._applied_font_size_key = "small"
+
+    panel._enqueue_font_intent("medium")
+    intent = panel._font_intents.popleft()
+    panel._font_inflight_intent_id = intent.intent_id
+
+    panel._enqueue_font_intent("large")
+    panel._ack_font_apply(intent_id=intent.intent_id, applied_key=intent.target_key, ok=True)
+
+    assert panel._font_size_key == "medium"
+    assert panel._applied_font_size_key == "medium"
+    assert panel._font_requested_key == "large"
+    assert len(panel._font_intents) == 1
+    assert panel._font_intents[-1].target_key == "large"
+    assert panel._dpg.bound == [22]
+
+
+def test_font_apply_intent_fast_path_avoids_rebinding_same_key() -> None:
+    class FakeDpg:
+        def __init__(self) -> None:
+            self.bind_calls = 0
+
+        def bind_font(self, _font: int) -> None:
+            self.bind_calls += 1
+
+    panel = DearPyGuiPanel(controller=type("Stub", (), {})(), title="Test")
+    panel._dpg = FakeDpg()
+    panel._font_handles = {"medium": 22}
+    panel._font_size_key = "medium"
+    panel._font_requested_key = "medium"
+    panel._applied_font_size_key = "medium"
+
+    panel._enqueue_font_intent("medium")
+    panel._process_font_intents()
+
+    assert panel._dpg.bind_calls == 0
+
+
+def test_font_size_combo_poll_no_longer_mutates_font_state() -> None:
+    class StubController:
+        pass
+
+    class FakeDpg:
+        def __init__(self) -> None:
+            self.combo_value = "XLarge (26)"
+
+        def get_value(self, tag: str) -> object:
+            assert tag == panel._font_size_combo_tag
+            return self.combo_value
+
+        def set_value(self, tag: str, value: object) -> None:
+            assert tag == panel._font_size_combo_tag
+            self.combo_value = str(value)
+
+        def bind_font(self, _font: int) -> None:
+            raise AssertionError("bind_font should not be called")
+
+    panel = DearPyGuiPanel(controller=StubController(), title="Test")
+    panel._dpg = FakeDpg()
+    panel._font_handles = {"small": 11, "medium": 22, "large": 33, "xlarge": 44}
+    panel._font_size_key = "medium"
+    panel._font_requested_key = "medium"
+    panel._applied_font_size_key = "medium"
+
+    panel._reconcile_font_size_combo_display()
+
+    assert panel._font_size_key == "medium"
+    assert panel._applied_font_size_key == "medium"
+
+
+def test_font_size_items_marks_unavailable_variants() -> None:
+    class StubController:
+        pass
+
+    panel = DearPyGuiPanel(controller=StubController(), title="Test")
+    panel._font_unavailable_reasons = {"large": "simulated install failure"}
+
+    items = panel._font_size_items()
+
+    assert "Large (22) [Unavailable]" in items
+
+
+def test_font_size_changed_rejects_unavailable_choice_and_keeps_applied_font() -> None:
+    class StubController:
+        pass
+
+    class FakeDpg:
+        def __init__(self) -> None:
+            self.bound = None
+            self.status_values: dict[str, object] = {}
+
+        def bind_font(self, font: int) -> None:
+            self.bound = font
+
+        def get_value(self, tag: str) -> object:
+            assert tag == panel._font_size_combo_tag
+            return "Large (22) [Unavailable]"
+
+        def set_value(self, tag: str, value: object) -> None:
+            self.status_values[tag] = value
+
+    panel = DearPyGuiPanel(controller=StubController(), title="Test")
+    panel._dpg = FakeDpg()
+    panel._font_handles = {"small": 101}
+    panel._font_unavailable_reasons = {"large": "simulated install failure"}
+    panel._font_size_key = "small"
+    panel._applied_font_size_key = "small"
+
+    panel._on_font_size_changed("Large (22) [Unavailable]")
+    panel._process_font_intents()
+
+    assert panel._font_size_key == "small"
+    assert panel._applied_font_size_key == "small"
+    assert panel._dpg.bound is None
+    assert panel._dpg.status_values[panel._status_text_tag] == "Font size 'large' unavailable."
+    assert panel._last_font_status_message == "Font size 'large' unavailable."
+    assert panel._dpg.status_values[panel._font_size_combo_tag] == "Small (14)"
+
+
+def test_font_apply_failure_surfaces_reason_and_keeps_applied_font() -> None:
+    class StubController:
+        pass
+
+    class FakeDpg:
+        def __init__(self) -> None:
+            self.status_values: dict[str, object] = {}
+
+        def bind_font(self, _font: int) -> None:
+            raise RuntimeError("simulated bind failure")
+
+        def set_value(self, tag: str, value: object) -> None:
+            self.status_values[tag] = value
+
+    panel = DearPyGuiPanel(controller=StubController(), title="Test")
+    panel._dpg = FakeDpg()
+    panel._font_handles = {"small": 11, "medium": 22}
+    panel._font_size_key = "small"
+    panel._font_requested_key = "small"
+    panel._applied_font_size_key = "small"
+
+    panel._on_font_size_changed("Medium (18)")
+    panel._process_font_intents()
+
+    assert panel._font_size_key == "small"
+    assert panel._applied_font_size_key == "small"
+    assert (
+        panel._dpg.status_values[panel._status_text_tag]
+        == "Font apply failed for 'medium': simulated bind failure"
+    )
+    assert panel._dpg.status_values[panel._font_size_combo_tag] == "Small (14)"
+
+
+def test_font_apply_is_idempotent_for_same_key() -> None:
+    class StubController:
+        pass
+
+    class FakeDpg:
+        def __init__(self) -> None:
+            self.bind_calls = 0
+
+        def bind_font(self, _font: int) -> None:
+            self.bind_calls += 1
+
+    panel = DearPyGuiPanel(controller=StubController(), title="Test")
+    panel._dpg = FakeDpg()
+    panel._font_handles = {"large": 33}
+    panel._font_size_key = "large"
+
+    panel._apply_font_size_if_needed()
+    panel._apply_font_size_if_needed()
+
+    assert panel._dpg.bind_calls == 1
+
+
+def test_clear_tool_output_resets_to_ready_message() -> None:
+    class StubController:
+        pass
+
+    class FakeDpg:
+        def __init__(self) -> None:
+            self.values: dict[str, object] = {}
+
+        def set_value(self, tag: str, value: object) -> None:
+            self.values[tag] = value
+
+    panel = DearPyGuiPanel(controller=StubController(), title="Test")
+    panel._dpg = FakeDpg()
+
+    panel._set_tool_result("export: rc=0\nstdout:\nDone")
+    panel._on_clear_tool_output_button()
+
+    assert panel._dpg.values[panel._tool_result_tag] == panel._text("tool_ready")
+
+
+def test_tool_progress_widget_updates_with_event_payload() -> None:
+    class StubController:
+        pass
+
+    class FakeDpg:
+        def __init__(self) -> None:
+            self.values: dict[str, object] = {}
+
+        def set_value(self, tag: str, value: object) -> None:
+            self.values[tag] = value
+
+    panel = DearPyGuiPanel(controller=StubController(), title="Test")
+    panel._dpg = FakeDpg()
+
+    panel._apply_tool_progress(0.42, "Exporting frames 42%")
+
+    assert panel._dpg.values[panel._tool_progress_bar_tag] == 0.42
+    assert panel._dpg.values[panel._tool_progress_text_tag] == "Exporting frames 42%"
+
+
+def test_tool_progress_ratio_never_regresses_for_same_task() -> None:
+    class StubController:
+        pass
+
+    class FakeDpg:
+        def __init__(self) -> None:
+            self.values: dict[str, object] = {}
+
+        def set_value(self, tag: str, value: object) -> None:
+            self.values[tag] = value
+
+    panel = DearPyGuiPanel(controller=StubController(), title="Test")
+    panel._dpg = FakeDpg()
+
+    panel._apply_tool_progress(0.7, "export: 7/10 frames")
+    panel._apply_tool_progress(0.2, "export: 2/10 frames")
+
+    assert panel._dpg.values[panel._tool_progress_bar_tag] == 0.7
+    assert panel._dpg.values[panel._tool_progress_text_tag] == "export: 7/10 frames"
+
+
+def test_tool_progress_ratio_resets_per_task() -> None:
+    class StubController:
+        pass
+
+    class FakeDpg:
+        def __init__(self) -> None:
+            self.values: dict[str, object] = {}
+
+        def set_value(self, tag: str, value: object) -> None:
+            self.values[tag] = value
+
+    class FakeThread:
+        def __init__(self, target, daemon: bool = False) -> None:
+            self.target = target
+            self.daemon = daemon
+
+        def start(self) -> None:
+            return None
+
+    panel = DearPyGuiPanel(controller=StubController(), title="Test")
+    panel._dpg = FakeDpg()
+    panel._tool_progress_ratio = 0.7
+
+    original_thread = dearpygui_panel_module.threading.Thread
+    dearpygui_panel_module.threading.Thread = FakeThread
+    try:
+        panel._launch_tool_task(task_name="export", execute=lambda _cb: "export: rc=0")
+    finally:
+        dearpygui_panel_module.threading.Thread = original_thread
+
+    assert panel._tool_progress_ratio == 0.0
+    assert panel._dpg.values[panel._tool_progress_bar_tag] == 0.0
+    assert panel._dpg.values[panel._tool_progress_text_tag] == "export: queued"
+
+
+def test_tune_action_sets_short_running_progress_state() -> None:
+    calls: list[tuple[str, float, float, float]] = []
+
+    class StubController:
+        def on_apply_ik_target(self, target_joint: str, dx: float, dy: float, dz: float) -> None:
+            calls.append((target_joint, dx, dy, dz))
+
+    class FakeDpg:
+        def __init__(self, panel: DearPyGuiPanel) -> None:
+            self.values: dict[str, object] = {
+                panel._edit_joint_combo_tag: "0 : joint_0",
+                panel._ik_dx_tag: 0.0,
+                panel._ik_dy_tag: 0.0,
+                panel._ik_dz_tag: 0.0,
+            }
+
+        def get_value(self, tag: str) -> object:
+            return self.values[tag]
+
+        def set_value(self, tag: str, value: object) -> None:
+            self.values[tag] = value
+
+    panel = DearPyGuiPanel(controller=StubController(), title="Test")
+    fake = FakeDpg(panel)
+    panel._dpg = fake
+
+    panel._on_apply_ik_button()
+
+    assert calls == [("joint_0", 0.0, 0.0, 0.0)]
+    assert float(fake.values[panel._tool_progress_bar_tag]) > 0.0
 
 
 def test_primary_monitor_line_formats_core_playback_state() -> None:
@@ -494,6 +1375,224 @@ def test_panel_has_tab_builder_methods_for_isolated_layout() -> None:
     assert hasattr(panel, "_build_convert_tab")
     assert hasattr(panel, "_build_export_tab")
     assert hasattr(panel, "_build_audio_tab")
+
+
+def test_panel_exposes_single_row_tune_nudge_builder() -> None:
+    class StubController:
+        pass
+
+    class FakeDpg:
+        def __init__(self) -> None:
+            self.events: list[tuple[str, object]] = []
+
+        class _GroupCtx:
+            def __init__(self, events: list[tuple[str, object]], horizontal: bool) -> None:
+                self._events = events
+                self._horizontal = horizontal
+
+            def __enter__(self) -> FakeDpg._GroupCtx:
+                self._events.append(("group_enter", self._horizontal))
+                return self
+
+            def __exit__(self, exc_type, exc, tb) -> bool:
+                self._events.append(("group_exit", self._horizontal))
+                return False
+
+        def group(self, horizontal: bool = False) -> FakeDpg._GroupCtx:
+            return self._GroupCtx(self.events, horizontal)
+
+        def add_text(self, label: str, tag: str | None = None) -> None:
+            self.events.append(("text", label))
+
+        def add_spacer(self, width: int) -> None:
+            self.events.append(("spacer", width))
+
+        def add_button(self, label: str, callback=None) -> None:
+            self.events.append(("button", label))
+
+    panel = DearPyGuiPanel(controller=StubController(), title="Test")
+    assert callable(panel._build_tune_nudge_row)
+
+    fake = FakeDpg()
+    panel._build_tune_nudge_row(fake)
+
+    assert [event[1] for event in fake.events if event[0] == "text"] == [
+        "Position Nudge",
+        "Rotation Nudge",
+    ]
+    assert [event[1] for event in fake.events if event[0] == "spacer"] == [24]
+    assert [event[1] for event in fake.events if event[0] == "button"] == [
+        "-X",
+        "+X",
+        "-Y",
+        "+Y",
+        "-Z",
+        "+Z",
+        "-R",
+        "+R",
+        "-P",
+        "+P",
+        "-Y",
+        "+Y",
+    ]
+    assert fake.events[0] == ("group_enter", True)
+
+
+def test_panel_tune_tab_invokes_single_row_tune_nudge_builder() -> None:
+    class StubController:
+        pass
+
+    class FakeDpg:
+        class _Ctx:
+            def __init__(self, events: list[tuple[str, object]], name: str, value: object) -> None:
+                self._events = events
+                self._name = name
+                self._value = value
+
+            def __enter__(self) -> FakeDpg._Ctx:
+                self._events.append((self._name, self._value))
+                return self
+
+            def __exit__(self, exc_type, exc, tb) -> bool:
+                self._events.append((f"{self._name}_exit", self._value))
+                return False
+
+        def __init__(self) -> None:
+            self.events: list[tuple[str, object]] = []
+
+        def group(self, horizontal: bool = False) -> FakeDpg._Ctx:
+            return self._Ctx(self.events, "group", horizontal)
+
+        def tooltip(self, item_tag: str) -> FakeDpg._Ctx:
+            return self._Ctx(self.events, "tooltip", item_tag)
+
+        def add_combo(self, **kwargs) -> None:
+            self.events.append(("combo", kwargs["label"]))
+
+        def add_text(self, text: str, tag: str | None = None, **kwargs) -> None:
+            self.events.append(("text", text))
+
+        def add_button(self, **kwargs) -> None:
+            self.events.append(("button", kwargs["label"]))
+
+        def add_slider_float(self, **kwargs) -> None:
+            self.events.append(("slider_float", kwargs["label"]))
+
+        def add_input_int(self, **kwargs) -> None:
+            self.events.append(("input_int", kwargs["label"]))
+
+        def add_input_float(self, **kwargs) -> None:
+            self.events.append(("input_float", kwargs["label"]))
+
+    panel = DearPyGuiPanel(controller=StubController(), title="Test")
+    called: list[object] = []
+    panel._build_tune_nudge_row = lambda dpg: called.append(dpg)
+
+    panel._build_tune_tab(FakeDpg())
+
+    assert len(called) == 1
+
+
+def test_panel_tune_nudge_button_callbacks_preserve_axis_sign_mapping() -> None:
+    class StubController:
+        pass
+
+    class FakeDpg:
+        def __init__(self) -> None:
+            self.buttons: list[tuple[str, object]] = []
+
+        class _GroupCtx:
+            def __enter__(self) -> FakeDpg._GroupCtx:
+                return self
+
+            def __exit__(self, exc_type, exc, tb) -> bool:
+                return False
+
+        def group(self, horizontal: bool = False) -> FakeDpg._GroupCtx:
+            return self._GroupCtx()
+
+        def add_text(self, label: str, tag: str | None = None) -> None:
+            return None
+
+        def add_spacer(self, width: int) -> None:
+            return None
+
+        def add_button(self, label: str, callback=None) -> None:
+            self.buttons.append((label, callback))
+
+    panel = DearPyGuiPanel(controller=StubController(), title="Test")
+    fake = FakeDpg()
+    panel._build_tune_nudge_row(fake)
+
+    expected = [
+        ("-X", ("position", 0, -1)),
+        ("+X", ("position", 0, 1)),
+        ("-Y", ("position", 1, -1)),
+        ("+Y", ("position", 1, 1)),
+        ("-Z", ("position", 2, -1)),
+        ("+Z", ("position", 2, 1)),
+        ("-R", ("rotation", 0, -1)),
+        ("+R", ("rotation", 0, 1)),
+        ("-P", ("rotation", 1, -1)),
+        ("+P", ("rotation", 1, 1)),
+        ("-Y", ("rotation", 2, -1)),
+        ("+Y", ("rotation", 2, 1)),
+    ]
+
+    assert [label for label, _ in fake.buttons] == [label for label, _ in expected]
+    assert len(fake.buttons) == len(expected), "Button mapping mismatch"
+    for (_label, callback), (_expected_label, (kind, axis, sign)) in zip(fake.buttons, expected):
+        panel._tune_state.target_position_m = np.zeros(3, dtype=np.float64)
+        panel._tune_state.target_euler_rad = np.zeros(3, dtype=np.float64)
+        callback(None, None, None)
+        panel._drain_ui_commands()
+        if kind == "position":
+            assert np.isclose(
+                panel._tune_state.target_position_m[axis],
+                float(sign) * panel._tune_state.step_position_m,
+            )
+        else:
+            assert np.isclose(
+                panel._tune_state.target_euler_rad[axis],
+                float(sign) * panel._tune_state.step_angle_rad,
+            )
+
+
+def test_panel_tune_nudge_row_renders_in_zh_language_mode() -> None:
+    class StubController:
+        pass
+
+    class FakeDpg:
+        def __init__(self) -> None:
+            self.texts: list[str] = []
+
+        class _GroupCtx:
+            def __enter__(self) -> FakeDpg._GroupCtx:
+                return self
+
+            def __exit__(self, exc_type, exc, tb) -> bool:
+                return False
+
+        def group(self, horizontal: bool = False) -> FakeDpg._GroupCtx:
+            return self._GroupCtx()
+
+        def add_text(self, label: str, tag: str | None = None) -> None:
+            self.texts.append(label)
+
+        def add_spacer(self, width: int) -> None:
+            return None
+
+        def add_button(self, label: str, callback=None) -> None:
+            return None
+
+    panel = DearPyGuiPanel(controller=StubController(), title="Test")
+    panel._set_language("zh")
+    fake = FakeDpg()
+
+    panel._build_tune_nudge_row(fake)
+
+    assert "位置微调" in fake.texts
+    assert "旋转微调" in fake.texts
 
 
 def test_position_unit_switch_preserves_internal_target_and_step_si() -> None:

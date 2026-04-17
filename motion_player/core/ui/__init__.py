@@ -41,26 +41,28 @@ class PlayerCommand(enum.Enum):
     STEP_BWD_10 = "step_bwd_10"
     STEP_FWD_100 = "step_fwd_100"
     STEP_BWD_100 = "step_bwd_100"
-    SEEK_FRAME = "seek_frame"      # payload: target frame index (int)
+    SEEK_FRAME = "seek_frame"  # payload: target frame index (int)
     RESET = "reset"
     TOGGLE_LOOP = "toggle_loop"
     TOGGLE_PINGPONG = "toggle_pingpong"
-    CLIP_SELECT = "clip_select"      # payload: clip index (int)
+    CLIP_SELECT = "clip_select"  # payload: clip index (int)
     MARK_KEYFRAME = "mark_keyframe"
     PREV_MARKED_FRAME = "prev_marked_frame"
     NEXT_MARKED_FRAME = "next_marked_frame"
     TOGGLE_GHOST = "toggle_ghost"
     TOGGLE_EDIT = "toggle_edit"
-    EDIT_DOF_DELTA = "edit_dof_delta"            # payload: {joint_idx, delta, propagate_radius?}
+    EDIT_DOF_DELTA = "edit_dof_delta"  # payload: {joint_idx, delta, propagate_radius?}
     EDIT_ROOT_POS_DELTA = "edit_root_pos_delta"  # payload: {dx, dy, dz}
-    APPLY_IK_TARGET = "apply_ik_target"          # payload: legacy {target_joint, dx, dy, dz} or full-pose payload
-    SET_EDIT_JOINT = "set_edit_joint"            # payload: dof index (int)
+    APPLY_IK_TARGET = (
+        "apply_ik_target"  # payload: legacy {target_joint, dx, dy, dz} or full-pose payload
+    )
+    SET_EDIT_JOINT = "set_edit_joint"  # payload: dof index (int)
     UNDO_EDIT = "undo_edit"
     REDO_EDIT = "redo_edit"
     SAVE_MOTION = "save_motion"
-    EXPORT_VIDEO = "export_video"                # payload: {output, fps}
+    EXPORT_VIDEO = "export_video"  # payload: {output, fps}
     TOGGLE_HUD = "toggle_hud"
-    SET_SPEED = "set_speed"        # payload: playback speed (float)
+    SET_SPEED = "set_speed"  # payload: playback speed (float)
     SPEED_UP = "speed_up"
     SPEED_DOWN = "speed_down"
     EXIT = "exit"
@@ -82,7 +84,7 @@ class PlayerState:
     keyframes: list[int] = field(default_factory=list)
     mark_history: list[int] = field(default_factory=list)
     selected_joint_idx: int = 0
-    direction: int = 1   # 1 = forward, -1 = backward (ping-pong)
+    direction: int = 1  # 1 = forward, -1 = backward (ping-pong)
 
     def toggle_play(self) -> None:
         self.playing = not self.playing

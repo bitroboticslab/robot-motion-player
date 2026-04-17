@@ -30,11 +30,48 @@ def run_backend_connected_gui(
     backend: str,
     require_panel: bool,
     warn_if_panel_unavailable: bool = False,
+    prefer_isolated: bool = False,
+    initial_font_size_key: str = "medium",
 ) -> int:
     """Run a backend-connected playback session with optional DearPyGui panel.
 
     When ``require_panel`` is True, DearPyGui availability is treated as required.
     """
+    if prefer_isolated:
+        from motion_player.cli.gui_runtime_isolated import run_backend_connected_gui_isolated
+
+        return run_backend_connected_gui_isolated(
+            motion=motion,
+            robot=robot,
+            root_joint=root_joint,
+            backend=backend,
+            require_panel=require_panel,
+            warn_if_panel_unavailable=warn_if_panel_unavailable,
+            initial_font_size_key=initial_font_size_key,
+        )
+
+    return _run_backend_connected_gui_in_process(
+        motion=motion,
+        robot=robot,
+        root_joint=root_joint,
+        backend=backend,
+        require_panel=require_panel,
+        warn_if_panel_unavailable=warn_if_panel_unavailable,
+        initial_font_size_key=initial_font_size_key,
+    )
+
+
+def _run_backend_connected_gui_in_process(
+    *,
+    motion: str,
+    robot: str,
+    root_joint: str,
+    backend: str,
+    require_panel: bool,
+    warn_if_panel_unavailable: bool = False,
+    initial_font_size_key: str = "medium",
+) -> int:
+    """Original in-process panel runtime used by `play --gui`."""
     motion_path = Path(motion)
     robot_path = Path(robot)
     if not motion_path.exists():
@@ -81,6 +118,7 @@ def run_backend_connected_gui(
             command_runner=CommandRunner(),
             default_motion_path=str(motion_path),
             default_robot_path=str(robot_path),
+            initial_font_size_key=initial_font_size_key,
         )
         panel.launch_non_blocking()
     elif require_panel:

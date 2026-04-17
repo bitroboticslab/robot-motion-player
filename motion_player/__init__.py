@@ -20,6 +20,6 @@ from importlib.metadata import version as _version
 try:
     __version__ = _version("robot-motion-player")
 except PackageNotFoundError:  # pragma: no cover
-    __version__ = "0.7.0.dev0"
+    __version__ = "0.8.0.dev0"
 
 __all__ = ["__version__"]

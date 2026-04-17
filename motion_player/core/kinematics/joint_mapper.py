@@ -168,17 +168,13 @@ class JointMapper:
             return dof_pos
 
         if self._perm is None:
-            self._perm = self.build_mapping(
-                self.dataset_joint_names, self.model_joint_names
-            )
+            self._perm = self.build_mapping(self.dataset_joint_names, self.model_joint_names)
 
         n = dof_pos.shape[0]
         d_model = len(self.model_joint_names)
         out = np.zeros((n, d_model), dtype=dof_pos.dtype)
 
-        for j, (src_idx, mname) in enumerate(
-            zip(self._perm, self.model_joint_names)
-        ):
+        for j, (src_idx, mname) in enumerate(zip(self._perm, self.model_joint_names)):
             if src_idx is not None:
                 col = dof_pos[:, src_idx].copy()
                 col *= self.sign_flip.get(mname, 1.0)

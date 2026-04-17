@@ -36,9 +36,9 @@ def make_motion(
 
     # Root position: walk forward along X
     t = np.linspace(0, num_frames / fps, num_frames)
-    root_pos = np.stack(
-        [t * 0.5, np.zeros(num_frames), np.full(num_frames, 0.9)], axis=1
-    ).astype(np.float32)
+    root_pos = np.stack([t * 0.5, np.zeros(num_frames), np.full(num_frames, 0.9)], axis=1).astype(
+        np.float32
+    )
 
     # Root rotation: identity quaternions (xyzw)
     root_rot = np.zeros((num_frames, 4), dtype=np.float32)
@@ -99,8 +99,6 @@ def isaac_backend_mock():
             if self._motion is None:
                 raise RuntimeError("No motion bound; call bind_motion() first.")
             if frame_idx < 0 or frame_idx >= self._motion.num_frames:
-                raise IndexError(
-                    f"Frame {frame_idx} out of range [0, {self._motion.num_frames})."
-                )
+                raise IndexError(f"Frame {frame_idx} out of range [0, {self._motion.num_frames}).")
 
     return _IsaacBackendMock()

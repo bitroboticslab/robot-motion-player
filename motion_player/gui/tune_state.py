@@ -35,7 +35,9 @@ class IkTuneState:
     target_joint: str = ""
     reference_frame: str = "world"
     current_position_m: np.ndarray = field(default_factory=lambda: np.zeros(3, dtype=np.float64))
-    current_quat_wxyz: np.ndarray = field(default_factory=lambda: np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64))
+    current_quat_wxyz: np.ndarray = field(
+        default_factory=lambda: np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
+    )
     target_position_m: np.ndarray = field(default_factory=lambda: np.zeros(3, dtype=np.float64))
     target_euler_rad: np.ndarray = field(default_factory=lambda: np.zeros(3, dtype=np.float64))
     position_unit: PositionUnit = PositionUnit.M
@@ -84,7 +86,9 @@ class IkTuneState:
 
     def set_position_display(self, vec: tuple[float, float, float], unit: str) -> None:
         self.position_unit = PositionUnit(unit)
-        self.target_position_m = convert_position_to_m(np.asarray(vec, dtype=np.float64), self.position_unit)
+        self.target_position_m = convert_position_to_m(
+            np.asarray(vec, dtype=np.float64), self.position_unit
+        )
 
     def set_target_position_display(self, vec: tuple[float, float, float], unit: str) -> None:
         self.set_position_display(vec, unit)
@@ -121,13 +125,19 @@ class IkTuneState:
         self.angle_unit = AngleUnit(unit)
 
     def set_step_position_display(self, value: float) -> None:
-        converted = float(convert_position_to_m(np.array([value], dtype=np.float64), self.position_unit)[0])
+        converted = float(
+            convert_position_to_m(np.array([value], dtype=np.float64), self.position_unit)[0]
+        )
         if not np.isfinite(converted):
             converted = self.step_position_m
         self.step_position_m = max(abs(converted), self._min_step_position_m)
 
     def display_step_position(self) -> float:
-        return float(convert_position_from_m(np.array([self.step_position_m], dtype=np.float64), self.position_unit)[0])
+        return float(
+            convert_position_from_m(
+                np.array([self.step_position_m], dtype=np.float64), self.position_unit
+            )[0]
+        )
 
     def set_step_angle_display(self, value: float) -> None:
         v = float(value)

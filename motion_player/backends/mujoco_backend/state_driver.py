@@ -210,21 +210,19 @@ class MuJoCoStateDriver:
         if not isinstance(frame_idx, int):
             raise TypeError(f"frame_idx must be int, got {type(frame_idx).__name__}.")
         if frame_idx < 0 or frame_idx >= self._motion.num_frames:
-            raise IndexError(
-                f"Frame {frame_idx} out of range [0, {self._motion.num_frames})."
-            )
+            raise IndexError(f"Frame {frame_idx} out of range [0, {self._motion.num_frames}).")
 
         m = self._motion
         mj = self._mujoco
 
         # Root position (x, y, z)
         adr = self._free_joint_adr
-        self.data.qpos[adr: adr + 3] = m.root_pos[frame_idx]
+        self.data.qpos[adr : adr + 3] = m.root_pos[frame_idx]
 
         # Root quaternion: xyzw → wxyz
         q_xyzw = m.root_rot[frame_idx].astype(np.float64)
         q_wxyz = xyzw_to_wxyz(q_xyzw)
-        self.data.qpos[adr + 3: adr + 7] = q_wxyz
+        self.data.qpos[adr + 3 : adr + 7] = q_wxyz
 
         # DOF positions
         for j, dof_adr in enumerate(self._dof_qpos_adr):

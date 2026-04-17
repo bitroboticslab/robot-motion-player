@@ -118,7 +118,9 @@ class MujocoXmlIKBackend:
         return quat / norm
 
     @classmethod
-    def _quat_delta_to_rotvec(cls, q_target_wxyz: np.ndarray, q_current_wxyz: np.ndarray) -> np.ndarray:
+    def _quat_delta_to_rotvec(
+        cls, q_target_wxyz: np.ndarray, q_current_wxyz: np.ndarray
+    ) -> np.ndarray:
         qt = cls._normalize_quat(q_target_wxyz)
         qc = cls._normalize_quat(q_current_wxyz)
 

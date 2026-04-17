@@ -148,9 +148,7 @@ class TestSegmentEditor:
     def test_smooth_segment_butter(self):
         m = make_motion(num_frames=100, num_dofs=4)
         seg = SegmentEditor(m)
-        seg.smooth_segment(
-            0, 99, "dof_pos", filter_type="butter", cutoff_hz=5.0
-        )
+        seg.smooth_segment(0, 99, "dof_pos", filter_type="butter", cutoff_hz=5.0)
         assert np.all(np.isfinite(m.dof_pos))
 
     def test_propagate_edit(self):

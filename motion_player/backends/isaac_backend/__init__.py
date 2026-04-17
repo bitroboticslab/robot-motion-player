@@ -94,9 +94,7 @@ class IsaacBackend:
         if not isinstance(frame_idx, int):
             raise TypeError(f"frame_idx must be int, got {type(frame_idx).__name__}.")
         if frame_idx < 0 or frame_idx >= self._motion.num_frames:
-            raise IndexError(
-                f"Frame {frame_idx} out of range [0, {self._motion.num_frames})."
-            )
+            raise IndexError(f"Frame {frame_idx} out of range [0, {self._motion.num_frames}).")
         raise NotImplementedError(
             "IsaacBackend.apply_frame is not implemented. "
             "Subclass IsaacBackend and implement this method."

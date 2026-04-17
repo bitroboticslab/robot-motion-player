@@ -24,6 +24,26 @@ motion_player play --motion path/to/clip.pkl --robot path/to/robot.xml --gui
 motion_player gui --motion path/to/clip.pkl --robot path/to/robot.xml
 ```
 
+`motion_player gui` now prefers an isolated panel process mode. If panel startup fails,
+the runtime prints a warning and continues in MuJoCo keyboard-only mode.
+
+### v0.8.0 GUI startup font-size controls
+
+Use startup font-size selection when launching GUI entry commands:
+
+```bash
+motion_player play --motion path/to/clip.pkl --robot path/to/robot.xml --gui --font-size large
+motion_player gui --motion path/to/clip.pkl --robot path/to/robot.xml --font-size xlarge
+```
+
+You can also set a default via environment variable:
+
+```bash
+export RMP_GUI_FONT_SIZE=medium
+```
+
+Supported values: `small`, `medium`, `large`, `xlarge`.
+
 ## 3) Essential keys
 
 - `Space`: play/pause
@@ -41,23 +61,16 @@ When GUI is enabled (`play --gui` or `gui`), the workbench provides tabbed tools
 The control deck still exposes all keyboard-mapped actions
 (`±1/10/100` stepping, loop/ping-pong, save, HUD toggle, speed ±, clip select, exit).
 Each interactive control also provides a hover tooltip that explains the action.
-The deck now presents a dedicated, high-visibility runtime monitor card with live playback
-state and mode flags for beginner-friendly status tracking while controlling playback.
+The status dock groups the runtime monitor, output log, and progress display for quick
+state checks while controlling playback.
 The Tune tab exposes full-pose IK numeric editing (position + orientation), unit switching
 (`m / cm / mm`, `rad / deg`), and step-based nudge controls for precise refinement.
 Tune workflow uses a dual-level data flow: `Current Pose` (runtime read-only) and
 `Target Pose` (editable fields), with explicit `Reference Frame` selection (`world` / local).
+For high-resolution displays, use the GUI header `Font Size` selector (next to `Language`);
+if no CJK font is available, the panel falls back to the best readable platform font.
+The output menu provides a `Clear` action, and export progress advances per rendered frame.
 For details, see [IK Usage Guide](IK_USAGE.md).
-
-GUI visual QA command (desktop session):
-
-```bash
-RMP_GUI_SNAPSHOT_OUT=/tmp/rmp-monitor-card.png \
-RMP_GUI_LAYOUT_REPORT_OUT=/tmp/rmp-monitor-card-layout.json \
-motion_player play --motion path/to/clip.pkl --robot path/to/robot.xml --gui
-```
-
-Expected report field in `/tmp/rmp-monitor-card-layout.json`: `"fits_all_lines": true`.
 
 ## 4) Generate quality report
 
@@ -96,7 +109,7 @@ Notes:
 motion_player export \
   --motion path/to/clip.pkl \
   --robot path/to/robot.xml \
-  --output /tmp/clip.gif \
+  --output clip.gif \
   --fps 20
 ```
 
@@ -107,3 +120,4 @@ motion_player export \
 - `Motion path not found` / `Robot model path not found`: verify absolute file paths.
 - Chinese labels show as `???`: install a CJK font and set `RMP_GUI_FONT=/absolute/path/to/font.ttf`.
 - If GUI startup reports a DearPyGui font-range error, upgrade to latest patch version and keep `RMP_GUI_FONT` pointing to a valid CJK font file.
+- If GUI startup warns that panel process could not start, playback is still running in viewer-only fallback mode.

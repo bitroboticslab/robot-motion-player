@@ -53,12 +53,15 @@ def _quat_multiply_xyzw(q1: np.ndarray, q2: np.ndarray) -> np.ndarray:
     """Multiply two xyzw quaternions: q_result = q1 ⊗ q2."""
     x1, y1, z1, w1 = q1
     x2, y2, z2, w2 = q2
-    return np.array([
-        w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
-        w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
-        w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2,
-        w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
-    ], dtype=np.float64)
+    return np.array(
+        [
+            w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
+            w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
+            w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2,
+            w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
+        ],
+        dtype=np.float64,
+    )
 
 
 class FrameEditor:
@@ -200,9 +203,7 @@ class FrameEditor:
         not provided at construction time.
         """
         if self._lo is not None and self._hi is not None:
-            self.motion.dof_pos[frame] = np.clip(
-                self.motion.dof_pos[frame], self._lo, self._hi
-            )
+            self.motion.dof_pos[frame] = np.clip(self.motion.dof_pos[frame], self._lo, self._hi)
 
     def normalize_quat(self, frame: int) -> None:
         """Normalise the root quaternion at *frame* to unit length."""
@@ -215,6 +216,4 @@ class FrameEditor:
 
     def _check_frame(self, frame: int) -> None:
         if not (0 <= frame < self.motion.num_frames):
-            raise IndexError(
-                f"Frame {frame} out of range [0, {self.motion.num_frames})."
-            )
+            raise IndexError(f"Frame {frame} out of range [0, {self.motion.num_frames}).")

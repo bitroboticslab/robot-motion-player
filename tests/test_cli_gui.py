@@ -6,7 +6,7 @@ import argparse
 import sys
 import types
 
-from motion_player.cli.main import _cmd_play, build_parser
+from motion_player.cli.main import _cmd_play, _resolve_gui_font_size_key, build_parser
 from motion_player.core.dataset.loader import DatasetLoader
 from tests.conftest import make_motion
 
@@ -45,10 +45,43 @@ def _install_fake_mujoco_runtime(captured: dict[str, object]) -> None:
 
 def test_play_has_gui_flag() -> None:
     parser = build_parser()
-    args = parser.parse_args(
-        ["play", "--motion", "m.pkl", "--robot", "r.xml", "--gui"]
-    )
+    args = parser.parse_args(["play", "--motion", "m.pkl", "--robot", "r.xml", "--gui"])
     assert args.gui is True
+
+
+def test_play_and_gui_expose_font_size_option() -> None:
+    parser = build_parser()
+
+    args_play = parser.parse_args(
+        [
+            "play",
+            "--motion",
+            "m.pkl",
+            "--robot",
+            "r.xml",
+            "--gui",
+            "--font-size",
+            "large",
+        ]
+    )
+    args_gui = parser.parse_args(
+        ["gui", "--motion", "m.pkl", "--robot", "r.xml", "--font-size", "xlarge"]
+    )
+
+    assert args_play.font_size == "large"
+    assert args_gui.font_size == "xlarge"
+
+
+def test_resolve_gui_font_size_key_uses_cli_then_env_then_default(monkeypatch) -> None:
+    monkeypatch.setenv("RMP_GUI_FONT_SIZE", "xlarge")
+    assert _resolve_gui_font_size_key("small") == "small"
+    assert _resolve_gui_font_size_key(None) == "xlarge"
+
+    monkeypatch.setenv("RMP_GUI_FONT_SIZE", "invalid")
+    assert _resolve_gui_font_size_key(None) == "medium"
+
+    monkeypatch.delenv("RMP_GUI_FONT_SIZE", raising=False)
+    assert _resolve_gui_font_size_key(None) == "medium"
 
 
 def test_parser_exposes_gui_subcommand() -> None:
@@ -93,6 +126,36 @@ def test_cmd_play_gui_wires_external_queue(tmp_path, monkeypatch) -> None:
     assert captured.get("external_queue") is not None
     assert captured.get("monitor_bus") is not None
     assert captured.get("panel_launched") is True
+
+
+def test_cmd_play_gui_passes_initial_font_size_key_to_runtime(tmp_path, monkeypatch) -> None:
+    motion_path = tmp_path / "walk.pkl"
+    robot_path = tmp_path / "robot.xml"
+    _write_valid_motion(motion_path)
+    robot_path.write_text("<mujoco/>", encoding="utf-8")
+
+    captured: dict[str, object] = {}
+
+    def _fake_runtime(**kwargs):
+        captured.update(kwargs)
+        return 0
+
+    monkeypatch.setattr("motion_player.cli.gui_runtime.run_backend_connected_gui", _fake_runtime)
+
+    args = argparse.Namespace(
+        motion=str(motion_path),
+        robot=str(robot_path),
+        root_joint="root",
+        mapping=None,
+        backend="mujoco",
+        gui=True,
+        font_size="large",
+    )
+
+    rc = _cmd_play(args)
+
+    assert rc == 0
+    assert captured["initial_font_size_key"] == "large"
 
 
 def test_cmd_play_gui_missing_dependency_falls_back(tmp_path, monkeypatch, capsys) -> None:

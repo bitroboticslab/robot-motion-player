@@ -43,7 +43,9 @@ def test_convert_urdf_input_to_urdf_prints_already_urdf_hint(capsys, tmp_path) -
     assert "already URDF" in captured.out
 
 
-def test_convert_xml_to_urdf_uses_external_backend_when_available(monkeypatch, capsys, tmp_path) -> None:
+def test_convert_xml_to_urdf_uses_external_backend_when_available(
+    monkeypatch, capsys, tmp_path
+) -> None:
     xml_in = tmp_path / "robot.xml"
     urdf_out = tmp_path / "robot.urdf"
     xml_in.write_text("<mujoco/>", encoding="utf-8")

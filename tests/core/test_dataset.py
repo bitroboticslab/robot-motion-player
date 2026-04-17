@@ -109,14 +109,10 @@ class TestDatasetLoader:
             "root_rot": root_rot,
             "dof_pos": rng.random((num_frames, num_dofs)).astype(np.float32),
             "dof_vel": rng.random((num_frames, num_dofs)).astype(np.float32),
-            "projected_gravity": np.tile(
-                [0.0, 0.0, -1.0], (num_frames, 1)
-            ).astype(np.float32),
+            "projected_gravity": np.tile([0.0, 0.0, -1.0], (num_frames, 1)).astype(np.float32),
             "root_lin_vel": rng.random((num_frames, 3)).astype(np.float32),
             "root_ang_vel": rng.random((num_frames, 3)).astype(np.float32),
-            "key_body_pos_local": rng.random(
-                (num_frames, num_bodies * 3)
-            ).astype(np.float32),
+            "key_body_pos_local": rng.random((num_frames, num_bodies * 3)).astype(np.float32),
         }
 
     def test_load_pkl(self, tmp_path):

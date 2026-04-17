@@ -131,9 +131,7 @@ class SegmentEditor:
         ).astype(np.float32)
 
         # --- root_rot ---
-        q0, q1 = m.root_rot[i0].astype(np.float64), m.root_rot[i1].astype(
-            np.float64
-        )
+        q0, q1 = m.root_rot[i0].astype(np.float64), m.root_rot[i1].astype(np.float64)
         if mode in ("slerp", "spline"):
             m.root_rot[i0 : i1 + 1] = _slerp(q0, q1, t).astype(np.float32)
         else:
@@ -216,13 +214,9 @@ class SegmentEditor:
             for col in range(segment.shape[1]):
                 smoothed[:, col] = sosfilt(sos, segment[:, col])
         else:
-            raise ValueError(
-                f"Unknown filter_type '{filter_type}'; use 'savgol' or 'butter'."
-            )
+            raise ValueError(f"Unknown filter_type '{filter_type}'; use 'savgol' or 'butter'.")
 
-        arr[i0 : i1 + 1] = smoothed.reshape(arr[i0 : i1 + 1].shape).astype(
-            arr.dtype
-        )
+        arr[i0 : i1 + 1] = smoothed.reshape(arr[i0 : i1 + 1].shape).astype(arr.dtype)
 
         # Re-normalise quaternions if we smoothed root_rot
         if field == "root_rot":
@@ -268,6 +262,4 @@ class SegmentEditor:
     def _check_segment(self, i0: int, i1: int) -> None:
         n = self.motion.num_frames
         if not (0 <= i0 < i1 < n):
-            raise IndexError(
-                f"Segment [{i0}, {i1}] out of valid range [0, {n})."
-            )
+            raise IndexError(f"Segment [{i0}, {i1}] out of valid range [0, {n}).")

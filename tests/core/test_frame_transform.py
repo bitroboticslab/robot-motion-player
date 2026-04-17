@@ -35,4 +35,3 @@ def test_rotate_point_identity_no_change() -> None:
     p = np.array([0.2, 0.3, 0.4], dtype=np.float64)
     out = rotate_point_wxyz(np.array([1.0, 0.0, 0.0, 0.0]), p)
     np.testing.assert_allclose(out, p, atol=1e-9)
-

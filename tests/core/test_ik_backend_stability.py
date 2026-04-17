@@ -27,7 +27,9 @@ def test_xml_backend_bounds_single_iteration_joint_update_norm() -> None:
         max_dq_norm=0.05,
     )
     q0 = np.zeros(2, dtype=np.float64)
-    target = PoseTarget(position_m=np.array([2.0, 2.0, 0.0], dtype=np.float64), orientation_wxyz=_identity_quat())
+    target = PoseTarget(
+        position_m=np.array([2.0, 2.0, 0.0], dtype=np.float64), orientation_wxyz=_identity_quat()
+    )
 
     q1 = backend.solve(q0, {"joint_0": target})
 
@@ -47,7 +49,9 @@ def test_xml_backend_skips_ill_conditioned_solve_when_requested() -> None:
         min_condition_eps=1e-8,
     )
     q0 = np.zeros(1, dtype=np.float64)
-    target = PoseTarget(position_m=np.array([1.0, 0.0, 0.0], dtype=np.float64), orientation_wxyz=_identity_quat())
+    target = PoseTarget(
+        position_m=np.array([1.0, 0.0, 0.0], dtype=np.float64), orientation_wxyz=_identity_quat()
+    )
 
     q1 = backend.solve(q0, {"joint_0": target})
 

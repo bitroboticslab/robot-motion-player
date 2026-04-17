@@ -46,7 +46,9 @@ def test_create_ik_solver_for_xml_prefers_runtime_driver(
 
         @classmethod
         def from_xml_path(cls, _path: Path):
-            raise AssertionError("from_xml_path should not be used when runtime driver is provided.")
+            raise AssertionError(
+                "from_xml_path should not be used when runtime driver is provided."
+            )
 
         def solve(self, current_qpos, targets):
             return current_qpos

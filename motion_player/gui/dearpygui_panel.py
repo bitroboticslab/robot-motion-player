@@ -22,7 +22,10 @@ import logging
 import os
 import threading
 import time
+from collections import deque
+from dataclasses import dataclass
 from pathlib import Path
+from queue import Empty, SimpleQueue
 from typing import TYPE_CHECKING, Callable
 
 import numpy as np
@@ -37,9 +40,10 @@ from motion_player.gui.command_models import (
     MetricsRequest,
 )
 from motion_player.gui.command_runner import CommandRunner
-from motion_player.gui.font_support import resolve_cjk_font
+from motion_player.gui.font_support import resolve_ui_font
 from motion_player.gui.layout_policy import MonitorCardLayout, build_monitor_card_layout
 from motion_player.gui.monitor_presenter import build_monitor_view_model
+from motion_player.gui.status_dock_layout import StatusDockLayout, build_status_dock_layout
 from motion_player.gui.tabs import TAB_IDS
 from motion_player.gui.timeline_widget import format_keyframe_line
 from motion_player.gui.tune_state import IkTuneState
@@ -48,6 +52,21 @@ if TYPE_CHECKING:
     from motion_player.gui.controller import GuiController
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class _FontIntent:
+    intent_id: int
+    target_key: str
+    source: str
+
+
+@dataclass(frozen=True)
+class _FontApplyResult:
+    intent_id: int
+    ok: bool
+    target_key: str
+    reason: str | None = None
 
 
 class DearPyGuiPanel:
@@ -59,6 +78,11 @@ class DearPyGuiPanel:
             "hero_title": "Playback Console",
             "hero_subtitle": "Use buttons/sliders here or keyboard shortcuts in MuJoCo.",
             "language_label": "Language",
+            "font_size_label": "Font Size",
+            "font_size_small": "Small",
+            "font_size_medium": "Medium",
+            "font_size_large": "Large",
+            "font_size_xlarge": "XLarge",
             "status_label": "Last Action",
             "status_idle": "Waiting for interaction",
             "status_prefix": "Executed: ",
@@ -140,6 +164,9 @@ class DearPyGuiPanel:
             "metrics_output": "Output (.json/.csv)",
             "metrics_run": "Run Metrics",
             "tool_output": "Tool Output",
+            "tool_clear": "Clear",
+            "status_dock_output_menu": "Output",
+            "tool_progress": "Task Progress",
             "tool_ready": "Ready.",
             "audit_motion": "Motion",
             "audit_robot": "Robot (.xml)",
@@ -163,6 +190,11 @@ class DearPyGuiPanel:
             "hero_title": "播放控制面板",
             "hero_subtitle": "可在此使用按钮/滑条，也可在 MuJoCo 使用键盘快捷键。",
             "language_label": "语言",
+            "font_size_label": "字号",
+            "font_size_small": "小",
+            "font_size_medium": "中",
+            "font_size_large": "大",
+            "font_size_xlarge": "超大",
             "status_label": "最近操作",
             "status_idle": "等待交互",
             "status_prefix": "已执行：",
@@ -244,6 +276,9 @@ class DearPyGuiPanel:
             "metrics_output": "输出路径 (.json/.csv)",
             "metrics_run": "执行指标",
             "tool_output": "工具输出",
+            "tool_clear": "清空",
+            "status_dock_output_menu": "输出",
+            "tool_progress": "任务进度",
             "tool_ready": "就绪。",
             "audit_motion": "动作文件",
             "audit_robot": "机器人模型 (.xml)",
@@ -267,6 +302,12 @@ class DearPyGuiPanel:
         "English": "en",
         "中文": "zh",
     }
+    _FONT_SIZE_SPECS: tuple[tuple[str, int], ...] = (
+        ("small", 14),
+        ("medium", 18),
+        ("large", 22),
+        ("xlarge", 26),
+    )
     _CONTROL_KEYS: tuple[str, ...] = (
         "play_pause",
         "reset",
@@ -380,6 +421,7 @@ class DearPyGuiPanel:
         command_runner: CommandRunner | None = None,
         default_motion_path: str = "",
         default_robot_path: str = "",
+        initial_font_size_key: str = "medium",
     ) -> None:
         self._controller = controller
         self._title = title
@@ -389,6 +431,7 @@ class DearPyGuiPanel:
         self._default_robot_path = default_robot_path
         self._tune_state = IkTuneState()
         self._language = "en"
+        self._font_size_key = self._normalize_font_size_key(initial_font_size_key)
         self._last_action_key: str | None = None
         self._worker: threading.Thread | None = None
         self._dpg = None
@@ -396,20 +439,30 @@ class DearPyGuiPanel:
         self._text_keys: dict[str, str] = {}
         self._window_tag = "rmp_gui_window"
         self._language_combo_tag = "rmp_gui_language_combo"
+        self._font_size_combo_tag = "rmp_gui_font_size_combo"
         self._hero_title_tag = "rmp_gui_hero_title"
         self._hero_subtitle_tag = "rmp_gui_hero_subtitle"
         self._language_text_tag = "rmp_gui_language_text"
+        self._font_size_text_tag = "rmp_gui_font_size_text"
         self._status_text_tag = "rmp_gui_status_text"
         self._monitor_title_tag = "rmp_gui_monitor_title"
         self._monitor_card_tag = "rmp_gui_monitor_card"
         self._monitor_line_1_tag = "rmp_gui_monitor_line_1"
         self._monitor_line_2_tag = "rmp_gui_monitor_line_2"
         self._monitor_line_3_tag = "rmp_gui_monitor_line_3"
+        self._dock_monitor_title_tag = "rmp_gui_dock_monitor_title"
+        self._dock_monitor_line_1_tag = "rmp_gui_dock_monitor_line_1"
+        self._dock_monitor_line_2_tag = "rmp_gui_dock_monitor_line_2"
+        self._dock_monitor_line_3_tag = "rmp_gui_dock_monitor_line_3"
         self._timeline_line_tag = "rmp_gui_timeline_line"
         self._mark_combo_tag = "rmp_gui_mark_combo"
         self._mark_history_text_tag = "rmp_gui_mark_history_text"
         self._workbench_tabbar_tag = "rmp_gui_workbench_tabs"
         self._tool_result_tag = "rmp_gui_tool_result"
+        self._tool_progress_bar_tag = "rmp_gui_tool_progress_bar"
+        self._tool_progress_text_tag = "rmp_gui_tool_progress_text"
+        self._status_dock_container_tag = "rmp_gui_status_dock_container"
+        self._status_dock_tag = "rmp_gui_status_dock"
         self._metrics_motion_tag = "rmp_gui_metrics_motion"
         self._metrics_output_tag = "rmp_gui_metrics_output"
         self._audit_motion_tag = "rmp_gui_audit_motion"
@@ -446,10 +499,28 @@ class DearPyGuiPanel:
         self._last_monitor_refresh = 0.0
         self._monitor_refresh_interval_s = 0.12
         self._tooltip_text_tags: dict[str, str] = {}
+        self._font_handles: dict[str, int] = {}
+        self._font_unavailable_reasons: dict[str, str] = {}
+        self._applied_font_size_key: str | None = None
+        self._last_font_status_message: str | None = None
+        self._last_rejected_font_size_key: str | None = None
+        self._font_intent_seq = 0
+        # Thread-safety: `_font_intents` is only accessed from the GUI thread
+        # (DearPyGui callbacks + the render loop), so we intentionally avoid locks.
+        self._font_intents: deque[_FontIntent] = deque()
+        self._font_inflight_intent_id: int | None = None
+        self._font_requested_key: str = self._font_size_key
+        self._ui_commands: deque[Callable[[], None]] = deque()
+        self._ui_commands_lock = threading.Lock()
+        self._tool_event_queue: SimpleQueue[tuple[str, object]] = SimpleQueue()
+        self._tool_task_running = False
+        self._tool_progress_ratio = 0.0
         self._visual_qa_snapshot_out = os.environ.get("RMP_GUI_SNAPSHOT_OUT")
         self._visual_qa_layout_report_out = os.environ.get("RMP_GUI_LAYOUT_REPORT_OUT")
         self._visual_qa_exported = False
         self._last_tune_sync_key: tuple[int, int] | None = None
+        self._last_runtime_error: str | None = None
+        self._process_status_callback: Callable[[str], None] | None = None
 
     @staticmethod
     def is_available() -> bool:
@@ -459,6 +530,13 @@ class DearPyGuiPanel:
     def _text(self, key: str) -> str:
         table = self._I18N.get(self._language, self._I18N["en"])
         return table.get(key, self._I18N["en"].get(key, key))
+
+    def _normalize_font_size_key(self, value: object) -> str:
+        if isinstance(value, str):
+            token = value.strip().lower()
+            if any(token == key for key, _size in self._FONT_SIZE_SPECS):
+                return token
+        return "medium"
 
     def _tooltip_text(self, key: str) -> str:
         table = self._TOOLTIPS.get(self._language, self._TOOLTIPS["en"])
@@ -477,13 +555,230 @@ class DearPyGuiPanel:
             if mapped is not None:
                 self._set_language(mapped)
 
+    def _font_size_items(self) -> list[str]:
+        labels = {
+            "small": self._text("font_size_small"),
+            "medium": self._text("font_size_medium"),
+            "large": self._text("font_size_large"),
+            "xlarge": self._text("font_size_xlarge"),
+        }
+        suffix = self._font_unavailable_suffix()
+        items: list[str] = []
+        for key, size in self._FONT_SIZE_SPECS:
+            label = f"{labels[key]} ({size})"
+            if key in self._font_unavailable_reasons:
+                label = f"{label} [{suffix}]"
+            items.append(label)
+        return items
+
+    def _font_unavailable_suffix(self) -> str:
+        return "不可用" if self._language == "zh" else "Unavailable"
+
+    def _font_size_key_from_label_or_none(self, value: object) -> str | None:
+        if not isinstance(value, str):
+            return None
+        token = value.strip().lower()
+        mapping = {
+            "small": "small",
+            "medium": "medium",
+            "large": "large",
+            "xlarge": "xlarge",
+            "小": "small",
+            "中": "medium",
+            "大": "large",
+            "超大": "xlarge",
+        }
+        if token in mapping:
+            return mapping[token]
+        head = value.split("(", 1)[0].strip()
+        head_token = head.lower()
+        if head_token in mapping:
+            return mapping[head_token]
+        if head in mapping:
+            return mapping[head]
+        return None
+
+    def _font_size_key_from_label(self, value: object) -> str:
+        resolved = self._font_size_key_from_label_or_none(value)
+        if resolved is not None:
+            return resolved
+        return self._font_size_key
+
+    def _font_size_key_from_index_or_none(self, value: object) -> str | None:
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, int):
+            idx = value
+        elif isinstance(value, float) and value.is_integer():
+            idx = int(value)
+        else:
+            return None
+        if idx < 0 or idx >= len(self._FONT_SIZE_SPECS):
+            return None
+        key, _size = self._FONT_SIZE_SPECS[idx]
+        return key
+
+    def _font_size_label(self, key: str) -> str:
+        for item in self._font_size_items():
+            if self._font_size_key_from_label(item) == key:
+                return item
+        items = self._font_size_items()
+        return items[1] if items else "Medium (18)"
+
+    def _set_font_status(self, message: str) -> None:
+        self._last_font_status_message = message
+        self._set_dpg_value_if_exists(self._status_text_tag, message)
+
+    def _reject_unavailable_font_selection(self, key: str) -> None:
+        message = f"Font size '{key}' unavailable."
+        if self._last_rejected_font_size_key != key:
+            logger.warning(
+                "Rejected unavailable GUI font size '%s': %s",
+                key,
+                self._font_unavailable_reasons.get(key, "no handle"),
+            )
+        self._last_rejected_font_size_key = key
+        self._set_font_status(message)
+        self._set_dpg_value_if_exists(
+            self._font_size_combo_tag, self._font_size_label(self._font_size_key)
+        )
+
+    def _apply_font_size_if_needed(self, dpg: object | None = None) -> None:
+        binder = dpg if dpg is not None else self._dpg
+        if binder is None:
+            return
+        font_handle = self._font_handles.get(self._font_size_key)
+        if font_handle is None:
+            return
+        if self._applied_font_size_key == self._font_size_key:
+            return
+        try:
+            binder.bind_font(font_handle)
+        except Exception:  # noqa: BLE001
+            return
+        self._applied_font_size_key = self._font_size_key
+        self._last_rejected_font_size_key = None
+
+    def _apply_font_size_key(self, key: str) -> bool:
+        if key in self._font_unavailable_reasons or key not in self._font_handles:
+            self._reject_unavailable_font_selection(key)
+            return False
+        self._font_size_key = key
+        self._apply_font_size_if_needed()
+        return True
+
+    def _bind_current_font(self, dpg: object | None = None) -> None:
+        self._apply_font_size_if_needed(dpg)
+
+    def _reconcile_font_size_combo_display(self) -> None:
+        if self._dpg is None:
+            return
+        getter = getattr(self._dpg, "get_value", None)
+        if not callable(getter):
+            return
+        try:
+            current_value = getter(self._font_size_combo_tag)
+        except Exception:  # noqa: BLE001
+            return
+        desired_value = self._font_size_label(self._font_requested_key)
+        if current_value == desired_value:
+            return
+        self._set_dpg_value_if_exists(self._font_size_combo_tag, desired_value)
+
+    def _enqueue_font_intent(self, key: str, source: str = "ui") -> None:
+        self._font_intent_seq += 1
+        self._font_requested_key = key
+        # "Latest wins": coalesce pending intents to the most recent selection.
+        self._font_intents.clear()
+        self._font_intents.append(_FontIntent(self._font_intent_seq, key, source))
+
+    def _apply_font_intent(self, intent: _FontIntent) -> _FontApplyResult:
+        key = intent.target_key
+        if key in self._font_unavailable_reasons or key not in self._font_handles:
+            return _FontApplyResult(
+                intent.intent_id,
+                ok=False,
+                target_key=key,
+                reason=self._font_unavailable_reasons.get(key, "no handle"),
+            )
+        binder = self._dpg
+        if binder is None:
+            return _FontApplyResult(intent.intent_id, ok=True, target_key=key)
+        if self._applied_font_size_key == key:
+            return _FontApplyResult(intent.intent_id, ok=True, target_key=key)
+        try:
+            binder.bind_font(self._font_handles[key])
+        except Exception as exc:  # noqa: BLE001
+            return _FontApplyResult(intent.intent_id, ok=False, target_key=key, reason=str(exc))
+        self._applied_font_size_key = key
+        self._last_rejected_font_size_key = None
+        return _FontApplyResult(intent.intent_id, ok=True, target_key=key)
+
+    def _process_font_intents(self) -> None:
+        if self._font_inflight_intent_id is not None:
+            return
+        if not self._font_intents:
+            return
+        intent = self._font_intents.popleft()
+        self._font_inflight_intent_id = intent.intent_id
+        result = self._apply_font_intent(intent)
+        self._ack_font_apply(
+            result.intent_id,
+            result.target_key,
+            ok=result.ok,
+            reason=result.reason,
+        )
+
+    def _ack_font_apply(
+        self,
+        intent_id: int,
+        applied_key: str,
+        ok: bool = True,
+        reason: str | None = None,
+    ) -> None:
+        if intent_id != self._font_inflight_intent_id:
+            return
+        self._font_inflight_intent_id = None
+        if ok:
+            self._font_size_key = applied_key
+            self._font_requested_key = (
+                self._font_intents[-1].target_key if self._font_intents else applied_key
+            )
+            self._apply_font_size_if_needed()
+            return
+
+        self._font_requested_key = (
+            self._font_intents[-1].target_key if self._font_intents else self._font_size_key
+        )
+        if applied_key in self._font_unavailable_reasons or applied_key not in self._font_handles:
+            self._reject_unavailable_font_selection(applied_key)
+            return
+
+        detail = reason or "unknown error"
+        logger.warning("GUI font apply failed for '%s': %s", applied_key, detail)
+        self._last_rejected_font_size_key = None
+        self._set_font_status(f"Font apply failed for '{applied_key}': {detail}")
+        if not self._font_intents:
+            self._set_dpg_value_if_exists(
+                self._font_size_combo_tag, self._font_size_label(self._font_size_key)
+            )
+
+    def _on_font_size_changed(self, value: object) -> None:
+        key = self._font_size_key_from_label_or_none(value)
+        if key is None:
+            key = self._font_size_key_from_index_or_none(value)
+        if key is None:
+            self._set_font_status("Font selection ignored: invalid payload.")
+            return
+        self._enqueue_font_intent(key, source="ui")
+
     def _make_dpg_callback(
         self,
         fn: Callable[[], None],
     ) -> Callable[[object, object, object | None], None]:
         def _callback(_sender: object, _app_data: object, _user_data: object | None = None) -> None:
             del _sender, _app_data, _user_data
-            fn()
+            self._enqueue_ui_command(fn)
 
         return _callback
 
@@ -493,9 +788,32 @@ class DearPyGuiPanel:
     ) -> Callable[[object, object, object | None], None]:
         def _callback(_sender: object, app_data: object, _user_data: object | None = None) -> None:
             del _sender, _user_data
-            fn(app_data)
+            self._enqueue_ui_command(lambda: fn(app_data))
 
         return _callback
+
+    def _enqueue_ui_command(self, command: Callable[[], None]) -> None:
+        with self._ui_commands_lock:
+            self._ui_commands.append(command)
+
+    def _drain_ui_commands(self) -> None:
+        while True:
+            with self._ui_commands_lock:
+                if not self._ui_commands:
+                    return
+                command = self._ui_commands.popleft()
+            command()
+
+    def _drain_dpg_callback_queue(self) -> None:
+        if self._dpg is None:
+            return
+        getter = getattr(self._dpg, "get_callback_queue", None)
+        runner = getattr(self._dpg, "run_callbacks", None)
+        if not callable(getter) or not callable(runner):
+            return
+        jobs = getter()
+        if jobs:
+            runner(jobs)
 
     def _register_label(self, tag: str, key: str) -> str:
         self._label_keys[tag] = key
@@ -505,27 +823,54 @@ class DearPyGuiPanel:
         self._text_keys[tag] = key
         return tag
 
+    def _dpg_item_exists(self, tag: str) -> bool:
+        if self._dpg is None:
+            return False
+        if not hasattr(self._dpg, "does_item_exist"):
+            return True
+        return bool(self._dpg.does_item_exist(tag))
+
+    def _set_dpg_value_if_exists(self, tag: str, value: object) -> None:
+        if self._dpg is None or not self._dpg_item_exists(tag):
+            return
+        self._dpg.set_value(tag, value)
+
+    def _configure_dpg_item_if_exists(self, tag: str, **kwargs: object) -> None:
+        if self._dpg is None or not self._dpg_item_exists(tag):
+            return
+        self._dpg.configure_item(tag, **kwargs)
+
     def _refresh_translations(self) -> None:
         if self._dpg is None:
             return
-        dpg = self._dpg
-        dpg.configure_item(self._window_tag, label=self._text("window_title"))
-        dpg.set_value(self._hero_title_tag, self._text("hero_title"))
-        dpg.set_value(self._hero_subtitle_tag, self._text("hero_subtitle"))
-        dpg.set_value(self._language_text_tag, self._text("language_label"))
-        dpg.set_value(self._monitor_title_tag, self._text("monitor_label"))
+        self._configure_dpg_item_if_exists(self._window_tag, label=self._text("window_title"))
+        self._set_dpg_value_if_exists(self._hero_title_tag, self._text("hero_title"))
+        self._set_dpg_value_if_exists(self._hero_subtitle_tag, self._text("hero_subtitle"))
+        self._set_dpg_value_if_exists(self._language_text_tag, self._text("language_label"))
+        self._set_dpg_value_if_exists(self._font_size_text_tag, self._text("font_size_label"))
         for tag, key in self._label_keys.items():
-            dpg.configure_item(tag, label=self._text(key))
+            self._configure_dpg_item_if_exists(tag, label=self._text(key))
         for tag, key in self._text_keys.items():
-            dpg.set_value(tag, self._text(key))
-        dpg.configure_item(self._ik_reference_frame_tag, items=self._reference_frame_items())
-        dpg.set_value(self._ik_reference_frame_tag, self._reference_frame_label(self._tune_state.reference_frame))
+            self._set_dpg_value_if_exists(tag, self._text(key))
+        self._configure_dpg_item_if_exists(
+            self._ik_reference_frame_tag, items=self._reference_frame_items()
+        )
+        self._set_dpg_value_if_exists(
+            self._ik_reference_frame_tag,
+            self._reference_frame_label(self._tune_state.reference_frame),
+        )
+        self._configure_dpg_item_if_exists(self._font_size_combo_tag, items=self._font_size_items())
+        self._set_dpg_value_if_exists(
+            self._font_size_combo_tag, self._font_size_label(self._font_requested_key)
+        )
+        self._reconcile_font_size_combo_display()
         for tab_id in TAB_IDS:
-            dpg.configure_item(f"rmp_tab_{tab_id}", label=self._tab_label(tab_id))
+            self._configure_dpg_item_if_exists(f"rmp_tab_{tab_id}", label=self._tab_label(tab_id))
         self._refresh_status_text()
         self._refresh_tooltips()
         self._refresh_monitor_lines(force=True)
         self._apply_monitor_card_layout()
+        self._apply_status_dock_layout()
 
     def _refresh_status_text(self) -> None:
         if self._dpg is None:
@@ -559,7 +904,11 @@ class DearPyGuiPanel:
         return [self._text("ik_reference_world"), self._text("ik_reference_local")]
 
     def _reference_frame_label(self, value: str) -> str:
-        return self._text("ik_reference_local") if value == "local" else self._text("ik_reference_world")
+        return (
+            self._text("ik_reference_local")
+            if value == "local"
+            else self._text("ik_reference_world")
+        )
 
     def _reference_frame_value_from_label(self, value: object) -> str:
         if not isinstance(value, str):
@@ -595,6 +944,63 @@ class DearPyGuiPanel:
             except Exception:  # noqa: BLE001
                 return
 
+    def _on_clear_tool_output_button(self) -> None:
+        self._set_tool_result(self._text("tool_ready"))
+
+    def _apply_tool_progress(self, ratio: float, message: str) -> None:
+        safe_ratio = max(0.0, min(1.0, float(ratio)))
+        if safe_ratio < self._tool_progress_ratio:
+            return
+        self._tool_progress_ratio = safe_ratio
+        if self._dpg is None:
+            return
+        try:
+            self._dpg.set_value(self._tool_progress_bar_tag, safe_ratio)
+            self._dpg.set_value(self._tool_progress_text_tag, str(message))
+        except Exception:  # noqa: BLE001
+            return
+
+    def _drain_tool_events(self) -> None:
+        if self._dpg is None:
+            return
+        while True:
+            try:
+                kind, payload = self._tool_event_queue.get_nowait()
+            except Empty:
+                break
+            if kind == "progress":
+                ratio, message = payload
+                self._apply_tool_progress(float(ratio), str(message))
+            elif kind == "result":
+                self._set_tool_result(str(payload))
+                self._tool_task_running = False
+
+    def _launch_tool_task(
+        self,
+        *,
+        task_name: str,
+        execute: Callable[[Callable[[float, str], None]], str],
+    ) -> None:
+        if self._tool_task_running:
+            self._set_tool_result("tool: rc=1\nstderr:\nA tool task is already running.")
+            return
+        self._tool_task_running = True
+        self._tool_progress_ratio = 0.0
+        self._apply_tool_progress(0.0, f"{task_name}: queued")
+
+        def _progress_callback(ratio: float, message: str) -> None:
+            self._tool_event_queue.put(("progress", (float(ratio), str(message))))
+
+        def _worker() -> None:
+            try:
+                result_text = execute(_progress_callback)
+            except Exception as exc:  # noqa: BLE001
+                result_text = f"{task_name}: rc=1\nstderr:\n{exc}"
+            self._tool_event_queue.put(("result", result_text))
+
+        thread = threading.Thread(target=_worker, daemon=True)
+        thread.start()
+
     def _format_command_result(self, title: str, rc: int, stdout: str, stderr: str) -> str:
         lines = [f"{title}: rc={rc}"]
         if stdout.strip():
@@ -610,9 +1016,16 @@ class DearPyGuiPanel:
             motion=self._get_text_input(self._metrics_motion_tag),
             output=self._get_text_input(self._metrics_output_tag) or None,
         )
-        result = self._command_runner.run_metrics(req)
-        self._set_tool_result(
-            self._format_command_result("metrics", result.return_code, result.stdout, result.stderr)
+
+        def _execute(progress_callback: Callable[[float, str], None]) -> str:
+            result = self._command_runner.run_metrics(req, progress_callback=progress_callback)
+            return self._format_command_result(
+                "metrics", result.return_code, result.stdout, result.stderr
+            )
+
+        self._launch_tool_task(
+            task_name="metrics",
+            execute=_execute,
         )
 
     def _run_audit_tool(self) -> None:
@@ -621,9 +1034,16 @@ class DearPyGuiPanel:
             robot=self._get_text_input(self._audit_robot_tag),
             output=self._get_text_input(self._audit_output_tag) or None,
         )
-        result = self._command_runner.run_audit(req)
-        self._set_tool_result(
-            self._format_command_result("audit", result.return_code, result.stdout, result.stderr)
+
+        def _execute(progress_callback: Callable[[float, str], None]) -> str:
+            result = self._command_runner.run_audit(req, progress_callback=progress_callback)
+            return self._format_command_result(
+                "audit", result.return_code, result.stdout, result.stderr
+            )
+
+        self._launch_tool_task(
+            task_name="audit",
+            execute=_execute,
         )
 
     def _run_convert_tool(self) -> None:
@@ -631,9 +1051,16 @@ class DearPyGuiPanel:
             input_path=self._get_text_input(self._convert_input_tag),
             output_path=self._get_text_input(self._convert_output_tag),
         )
-        result = self._command_runner.run_convert(req)
-        self._set_tool_result(
-            self._format_command_result("convert", result.return_code, result.stdout, result.stderr)
+
+        def _execute(progress_callback: Callable[[float, str], None]) -> str:
+            result = self._command_runner.run_convert(req, progress_callback=progress_callback)
+            return self._format_command_result(
+                "convert", result.return_code, result.stdout, result.stderr
+            )
+
+        self._launch_tool_task(
+            task_name="convert",
+            execute=_execute,
         )
 
     def _run_export_tool(self) -> None:
@@ -649,15 +1076,24 @@ class DearPyGuiPanel:
             output=self._get_text_input(self._export_output_tag),
             fps=fps,
         )
-        result = self._command_runner.run_export(req)
-        self._set_tool_result(
-            self._format_command_result("export", result.return_code, result.stdout, result.stderr)
+
+        def _execute(progress_callback: Callable[[float, str], None]) -> str:
+            result = self._command_runner.run_export(req, progress_callback=progress_callback)
+            return self._format_command_result(
+                "export", result.return_code, result.stdout, result.stderr
+            )
+
+        self._launch_tool_task(
+            task_name="export",
+            execute=_execute,
         )
 
     def _run_audio_tool(self, action: str) -> None:
         result = self._command_runner.run_audio(AudioRequest(action=action))
         self._set_tool_result(
-            self._format_command_result(f"audio:{action}", result.return_code, result.stdout, result.stderr)
+            self._format_command_result(
+                f"audio:{action}", result.return_code, result.stdout, result.stderr
+            )
         )
 
     def _safe_float_input(self, tag: str, fallback: float) -> float:
@@ -678,7 +1114,10 @@ class DearPyGuiPanel:
         rot = self._tune_state.display_target_rotation()
         self._dpg.set_value(self._ik_pos_unit_tag, self._tune_state.position_unit.value)
         self._dpg.set_value(self._ik_angle_unit_tag, self._tune_state.angle_unit.value)
-        self._dpg.set_value(self._ik_reference_frame_tag, self._reference_frame_label(self._tune_state.reference_frame))
+        self._dpg.set_value(
+            self._ik_reference_frame_tag,
+            self._reference_frame_label(self._tune_state.reference_frame),
+        )
         self._dpg.set_value(self._ik_pos_x_tag, float(pos[0]))
         self._dpg.set_value(self._ik_pos_y_tag, float(pos[1]))
         self._dpg.set_value(self._ik_pos_z_tag, float(pos[2]))
@@ -714,28 +1153,47 @@ class DearPyGuiPanel:
     ) -> None:
         if self._dpg is None:
             return
-        pos_unit = str(position_unit_override or self._dpg.get_value(self._ik_pos_unit_tag) or self._tune_state.position_unit.value)
+        pos_unit = str(
+            position_unit_override
+            or self._dpg.get_value(self._ik_pos_unit_tag)
+            or self._tune_state.position_unit.value
+        )
         angle_unit = str(
-            angle_unit_override or self._dpg.get_value(self._ik_angle_unit_tag) or self._tune_state.angle_unit.value
+            angle_unit_override
+            or self._dpg.get_value(self._ik_angle_unit_tag)
+            or self._tune_state.angle_unit.value
         )
         self._tune_state.set_reference_frame(
             self._reference_frame_value_from_label(
-                self._dpg.get_value(self._ik_reference_frame_tag) or self._tune_state.reference_frame
+                self._dpg.get_value(self._ik_reference_frame_tag)
+                or self._tune_state.reference_frame
             )
         )
         self._tune_state.set_position_display(
             (
-                self._safe_float_input(self._ik_pos_x_tag, float(self._tune_state.display_position()[0])),
-                self._safe_float_input(self._ik_pos_y_tag, float(self._tune_state.display_position()[1])),
-                self._safe_float_input(self._ik_pos_z_tag, float(self._tune_state.display_position()[2])),
+                self._safe_float_input(
+                    self._ik_pos_x_tag, float(self._tune_state.display_position()[0])
+                ),
+                self._safe_float_input(
+                    self._ik_pos_y_tag, float(self._tune_state.display_position()[1])
+                ),
+                self._safe_float_input(
+                    self._ik_pos_z_tag, float(self._tune_state.display_position()[2])
+                ),
             ),
             unit=pos_unit,
         )
         self._tune_state.set_rotation_display(
             (
-                self._safe_float_input(self._ik_rot_roll_tag, float(self._tune_state.display_rotation()[0])),
-                self._safe_float_input(self._ik_rot_pitch_tag, float(self._tune_state.display_rotation()[1])),
-                self._safe_float_input(self._ik_rot_yaw_tag, float(self._tune_state.display_rotation()[2])),
+                self._safe_float_input(
+                    self._ik_rot_roll_tag, float(self._tune_state.display_rotation()[0])
+                ),
+                self._safe_float_input(
+                    self._ik_rot_pitch_tag, float(self._tune_state.display_rotation()[1])
+                ),
+                self._safe_float_input(
+                    self._ik_rot_yaw_tag, float(self._tune_state.display_rotation()[2])
+                ),
             ),
             unit=angle_unit,
         )
@@ -756,7 +1214,10 @@ class DearPyGuiPanel:
             self._tune_state.target_position_m = self._tune_state.current_position_m.copy()
             quat = np.asarray(self._tune_state.current_quat_wxyz, dtype=np.float64)
             euler = quat_wxyz_to_euler_xyz(quat, AngleUnit(self._tune_state.angle_unit.value))
-            self._tune_state.set_rotation_display((float(euler[0]), float(euler[1]), float(euler[2])), unit=self._tune_state.angle_unit.value)
+            self._tune_state.set_rotation_display(
+                (float(euler[0]), float(euler[1]), float(euler[2])),
+                unit=self._tune_state.angle_unit.value,
+            )
         self._sync_tune_inputs_from_state()
 
     def _on_tune_position_unit_changed(self, value: object) -> None:
@@ -820,6 +1281,7 @@ class DearPyGuiPanel:
                 propagate_radius=propagate_radius,
             ),
         )
+        self._apply_tool_progress(1.0, "tune: full-pose IK dispatched")
 
     def _monitor_placeholder_line_primary(self) -> str:
         return self._text("monitor_line_1_placeholder")
@@ -888,7 +1350,9 @@ class DearPyGuiPanel:
             return f"{self._text('mark_history_label')}: {self._text('mark_history_none')}"
         history_tail = [int(frame) + 1 for frame in snap.mark_history[-12:]]
         arrow = " -> "
-        return f"{self._text('mark_history_label')}: " + arrow.join(str(frame) for frame in history_tail)
+        return f"{self._text('mark_history_label')}: " + arrow.join(
+            str(frame) for frame in history_tail
+        )
 
     def _reset_marked_frames_widgets(self) -> None:
         if self._dpg is None:
@@ -984,25 +1448,41 @@ class DearPyGuiPanel:
         if self._dpg is None:
             return
 
+        if not self._dpg_item_exists(self._monitor_card_tag):
+            return
+
         width = width_hint
         if width is None:
             width = int(self._dpg.get_viewport_client_width())
 
         layout = self._build_monitor_card_layout_for_width(width)
-        self._dpg.configure_item(self._monitor_card_tag, height=layout.card_height)
-        self._dpg.configure_item(self._monitor_line_1_tag, wrap=layout.line_wrap_px)
-        self._dpg.configure_item(self._monitor_line_2_tag, wrap=layout.line_wrap_px)
-        self._dpg.configure_item(self._monitor_line_3_tag, wrap=layout.line_wrap_px)
+        self._configure_dpg_item_if_exists(self._monitor_card_tag, height=layout.card_height)
+        self._configure_dpg_item_if_exists(self._monitor_line_1_tag, wrap=layout.line_wrap_px)
+        self._configure_dpg_item_if_exists(self._monitor_line_2_tag, wrap=layout.line_wrap_px)
+        self._configure_dpg_item_if_exists(self._monitor_line_3_tag, wrap=layout.line_wrap_px)
+
+    def _apply_status_dock_layout(self, width_hint: int | None = None) -> None:
+        if self._dpg is None:
+            return
+
+        width = width_hint
+        if width is None:
+            width = int(self._dpg.get_viewport_client_width())
+
+        self._rebuild_status_dock(width_hint=width)
 
     def _on_viewport_resized_dpg(self, app_data: object) -> None:
         width = None
         if isinstance(app_data, (list, tuple)) and len(app_data) >= 1:
             width = int(app_data[0])
+        self._apply_status_dock_layout(width_hint=width)
         self._apply_monitor_card_layout(width_hint=width)
 
     def _build_monitor_card_layout_report(self) -> dict[str, object]:
         if self._dpg is None:
             return {"fits_all_lines": False, "reason": "dpg-unavailable"}
+        if not self._dpg_item_exists(self._monitor_card_tag):
+            return {"fits_all_lines": False, "reason": "monitor-card-unavailable"}
 
         card_w, card_h = self._dpg.get_item_rect_size(self._monitor_card_tag)
         _w1, h1 = self._dpg.get_item_rect_size(self._monitor_line_1_tag)
@@ -1050,6 +1530,27 @@ class DearPyGuiPanel:
         _headline, _subline, flags = self._format_monitor_card_lines(snap)
         return flags
 
+    def _refresh_status_dock_monitor_lines(self, snap: PlaybackSnapshot | None) -> None:
+        if self._dpg is None:
+            return
+        if snap is None:
+            self._set_dpg_value_if_exists(self._dock_monitor_title_tag, self._text("monitor_label"))
+            self._set_dpg_value_if_exists(
+                self._dock_monitor_line_1_tag, self._monitor_placeholder_line_primary()
+            )
+            self._set_dpg_value_if_exists(
+                self._dock_monitor_line_2_tag, self._monitor_placeholder_line_secondary()
+            )
+            self._set_dpg_value_if_exists(
+                self._dock_monitor_line_3_tag, self._monitor_placeholder_line_flags()
+            )
+            return
+        headline, subline, flags = self._format_monitor_card_lines(snap)
+        self._set_dpg_value_if_exists(self._dock_monitor_title_tag, self._text("monitor_label"))
+        self._set_dpg_value_if_exists(self._dock_monitor_line_1_tag, headline)
+        self._set_dpg_value_if_exists(self._dock_monitor_line_2_tag, subline)
+        self._set_dpg_value_if_exists(self._dock_monitor_line_3_tag, flags)
+
     def _refresh_monitor_lines(self, force: bool = False) -> None:
         if self._dpg is None:
             return
@@ -1058,24 +1559,39 @@ class DearPyGuiPanel:
             return
         self._last_monitor_refresh = now
         if self._monitor_bus is None:
-            self._dpg.set_value(self._monitor_line_1_tag, self._monitor_placeholder_line_primary())
-            self._dpg.set_value(self._monitor_line_2_tag, self._monitor_placeholder_line_secondary())
-            self._dpg.set_value(self._monitor_line_3_tag, self._monitor_placeholder_line_flags())
+            self._set_dpg_value_if_exists(
+                self._monitor_line_1_tag, self._monitor_placeholder_line_primary()
+            )
+            self._set_dpg_value_if_exists(
+                self._monitor_line_2_tag, self._monitor_placeholder_line_secondary()
+            )
+            self._set_dpg_value_if_exists(
+                self._monitor_line_3_tag, self._monitor_placeholder_line_flags()
+            )
+            self._refresh_status_dock_monitor_lines(None)
             self._dpg.set_value(self._timeline_line_tag, self._timeline_placeholder_line())
             self._reset_marked_frames_widgets()
             return
         snap = self._monitor_bus.latest()
         if snap is None:
-            self._dpg.set_value(self._monitor_line_1_tag, self._monitor_placeholder_line_primary())
-            self._dpg.set_value(self._monitor_line_2_tag, self._monitor_placeholder_line_secondary())
-            self._dpg.set_value(self._monitor_line_3_tag, self._monitor_placeholder_line_flags())
+            self._set_dpg_value_if_exists(
+                self._monitor_line_1_tag, self._monitor_placeholder_line_primary()
+            )
+            self._set_dpg_value_if_exists(
+                self._monitor_line_2_tag, self._monitor_placeholder_line_secondary()
+            )
+            self._set_dpg_value_if_exists(
+                self._monitor_line_3_tag, self._monitor_placeholder_line_flags()
+            )
+            self._refresh_status_dock_monitor_lines(None)
             self._dpg.set_value(self._timeline_line_tag, self._timeline_placeholder_line())
             self._reset_marked_frames_widgets()
             return
         headline, subline, flags = self._format_monitor_card_lines(snap)
-        self._dpg.set_value(self._monitor_line_1_tag, headline)
-        self._dpg.set_value(self._monitor_line_2_tag, subline)
-        self._dpg.set_value(self._monitor_line_3_tag, flags)
+        self._set_dpg_value_if_exists(self._monitor_line_1_tag, headline)
+        self._set_dpg_value_if_exists(self._monitor_line_2_tag, subline)
+        self._set_dpg_value_if_exists(self._monitor_line_3_tag, flags)
+        self._refresh_status_dock_monitor_lines(snap)
         self._refresh_joint_selector_from_snapshot(snap)
         self._refresh_marked_frames_from_snapshot(snap)
         self._dpg.set_value(
@@ -1099,17 +1615,52 @@ class DearPyGuiPanel:
             Path("C:/Windows/Fonts/simhei.ttf"),
         ]
 
+    def _default_ui_font_candidates(self) -> list[Path]:
+        return [
+            Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+            Path("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"),
+            Path("/System/Library/Fonts/Supplemental/Arial Unicode.ttf"),
+            Path("C:/Windows/Fonts/arial.ttf"),
+            Path("C:/Windows/Fonts/segoeui.ttf"),
+        ]
+
     def _install_fonts(self, dpg: object) -> None:
-        font_path = resolve_cjk_font(self._default_cjk_candidates())
+        self._font_handles = {}
+        self._font_unavailable_reasons = {}
+        self._applied_font_size_key = None
+        font_path = resolve_ui_font(
+            cjk_candidates=self._default_cjk_candidates(),
+            fallback_candidates=self._default_ui_font_candidates(),
+        )
         if font_path is None:
-            return
-        try:
-            with dpg.font_registry():
-                font = dpg.add_font(str(font_path), 18)
-                dpg.add_font_range_hint(dpg.mvFontRangeHint_Chinese_Full, parent=font)
-                dpg.bind_font(font)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("GUI CJK font setup failed for %s: %s", font_path, exc)
+            for key, _size in self._FONT_SIZE_SPECS:
+                self._font_unavailable_reasons[key] = "font path not found"
+            raise RuntimeError("No GUI font file resolved.")
+        with dpg.font_registry():
+            for key, size in self._FONT_SIZE_SPECS:
+                try:
+                    font = dpg.add_font(str(font_path), int(size))
+                    dpg.add_font_range_hint(dpg.mvFontRangeHint_Chinese_Full, parent=font)
+                    self._font_handles[key] = font
+                except Exception as exc:  # noqa: BLE001
+                    self._font_unavailable_reasons[key] = str(exc)
+                    logger.warning(
+                        "GUI font size '%s' (%s) failed for %s: %s",
+                        key,
+                        size,
+                        font_path,
+                        exc,
+                    )
+        if self._font_size_key not in self._font_handles and self._font_handles:
+            fallback_key = next(iter(self._font_handles))
+            self._set_font_status(
+                f"Font size '{self._font_size_key}' unavailable. Using '{fallback_key}'."
+            )
+            self._font_size_key = fallback_key
+            self._font_requested_key = fallback_key
+        if not self._font_handles:
+            raise RuntimeError("No GUI font size variants available after initialization.")
+        self._apply_font_size_if_needed(dpg)
 
     def _attach_tooltip(self, dpg: object, item_tag: str, tip_key: str) -> None:
         text_tag = f"tooltip_text_{item_tag}"
@@ -1155,6 +1706,203 @@ class DearPyGuiPanel:
             dpg.add_theme_style(dpg.mvStyleVar_WindowPadding, 10, 8, category=dpg.mvThemeCat_Core)
         return theme
 
+    def _build_status_monitor_section(self, dpg: object, layout: StatusDockLayout) -> None:
+        with dpg.child_window(
+            border=True,
+            width=layout.monitor_width,
+            height=layout.row1_height,
+        ):
+            dpg.add_text(
+                self._text("monitor_label"),
+                tag=self._register_text(self._dock_monitor_title_tag, "monitor_label"),
+                color=(95, 200, 255),
+            )
+            dpg.add_text(
+                self._monitor_placeholder_line_primary(),
+                tag=self._dock_monitor_line_1_tag,
+                wrap=layout.monitor_width - 24,
+            )
+            dpg.add_text(
+                self._monitor_placeholder_line_secondary(),
+                tag=self._dock_monitor_line_2_tag,
+                wrap=layout.monitor_width - 24,
+            )
+            dpg.add_text(
+                self._monitor_placeholder_line_flags(),
+                tag=self._dock_monitor_line_3_tag,
+                wrap=layout.monitor_width - 24,
+            )
+
+    def _build_status_output_section(self, dpg: object, layout: StatusDockLayout) -> None:
+        with dpg.child_window(
+            border=True,
+            width=layout.output_width,
+            height=layout.row1_height,
+        ):
+            with dpg.group(horizontal=True):
+                dpg.add_text(
+                    self._text("tool_output"),
+                    tag=self._register_text("txt_tool_output", "tool_output"),
+                )
+                dpg.add_spacer(width=16)
+                dpg.add_button(
+                    label=self._text("tool_clear"),
+                    callback=self._make_dpg_callback(self._on_clear_tool_output_button),
+                    tag=self._register_label("btn_tool_clear", "tool_clear"),
+                )
+            dpg.add_input_text(
+                multiline=True,
+                readonly=True,
+                width=max(200, layout.output_width - 24),
+                height=max(44, layout.row1_height - 66),
+                tag=self._tool_result_tag,
+                default_value=self._text("tool_ready"),
+            )
+
+    def _build_status_progress_section(self, dpg: object, layout: StatusDockLayout) -> None:
+        with dpg.child_window(
+            border=True,
+            width=layout.progress_width,
+            height=layout.row2_height,
+        ):
+            dpg.add_text(
+                self._text("tool_progress"),
+                tag=self._register_text("txt_tool_progress", "tool_progress"),
+            )
+            dpg.add_progress_bar(
+                default_value=0.0,
+                width=max(180, layout.progress_width - 24),
+                tag=self._tool_progress_bar_tag,
+            )
+            dpg.add_text("", tag=self._tool_progress_text_tag)
+
+    def _build_status_dock(
+        self,
+        dpg: object,
+        window_width: int = 760,
+        parent: str | None = None,
+    ) -> None:
+        layout = build_status_dock_layout(window_width)
+        parent_tag = parent or self._window_tag
+        with dpg.child_window(
+            height=layout.dock_height,
+            border=True,
+            tag=self._status_dock_tag,
+            parent=parent_tag,
+        ):
+            with dpg.menu_bar():
+                with dpg.menu(
+                    label=self._text("status_dock_output_menu"),
+                    tag=self._register_label("menu_status_dock_output", "status_dock_output_menu"),
+                ):
+                    dpg.add_menu_item(
+                        label=self._text("tool_clear"),
+                        callback=self._make_dpg_callback(self._on_clear_tool_output_button),
+                        tag=self._register_label("btn_status_output_clear", "tool_clear"),
+                    )
+            if layout.stacked:
+                self._build_status_monitor_section(dpg, layout)
+                self._build_status_output_section(dpg, layout)
+                self._build_status_progress_section(dpg, layout)
+            else:
+                with dpg.group(horizontal=True):
+                    self._build_status_monitor_section(dpg, layout)
+                    self._build_status_output_section(dpg, layout)
+                self._build_status_progress_section(dpg, layout)
+
+    def _rebuild_status_dock(self, width_hint: int | None = None) -> None:
+        if self._dpg is None:
+            return
+        if hasattr(self._dpg, "does_item_exist") and not self._dpg.does_item_exist(
+            self._status_dock_container_tag
+        ):
+            return
+        captured_tool_result: object | None = None
+        captured_tool_progress_ratio = self._tool_progress_ratio
+        captured_tool_progress_text: object | None = None
+        for tag, target in (
+            (self._tool_result_tag, "result"),
+            (self._tool_progress_bar_tag, "ratio"),
+            (self._tool_progress_text_tag, "text"),
+        ):
+            try:
+                if (
+                    tag
+                    and hasattr(self._dpg, "does_item_exist")
+                    and not self._dpg.does_item_exist(tag)
+                ):
+                    continue
+                value = self._dpg.get_value(tag)
+            except Exception:  # noqa: BLE001
+                continue
+            if target == "result":
+                captured_tool_result = value
+            elif target == "ratio":
+                try:
+                    captured_tool_progress_ratio = float(value)
+                except Exception:  # noqa: BLE001
+                    pass
+            else:
+                captured_tool_progress_text = value
+        try:
+            self._dpg.delete_item(self._status_dock_tag)
+        except Exception:  # noqa: BLE001
+            pass
+        if width_hint is None:
+            width_hint = int(self._dpg.get_viewport_client_width())
+        try:
+            self._build_status_dock(
+                self._dpg,
+                window_width=width_hint,
+                parent=self._status_dock_container_tag,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Status dock rebuild failed (fail-open): %s", exc)
+            self._tool_progress_ratio = float(captured_tool_progress_ratio)
+            return
+        if captured_tool_result is not None:
+            try:
+                self._dpg.set_value(self._tool_result_tag, captured_tool_result)
+            except Exception:  # noqa: BLE001
+                pass
+        try:
+            self._dpg.set_value(self._tool_progress_bar_tag, captured_tool_progress_ratio)
+        except Exception:  # noqa: BLE001
+            pass
+        if captured_tool_progress_text is not None:
+            try:
+                self._dpg.set_value(self._tool_progress_text_tag, captured_tool_progress_text)
+            except Exception:  # noqa: BLE001
+                pass
+        self._tool_progress_ratio = float(captured_tool_progress_ratio)
+
+    def _build_tool_output_panel(self, dpg: object) -> None:
+        dpg.add_separator()
+        with dpg.group(horizontal=True):
+            dpg.add_text(
+                self._text("tool_output"), tag=self._register_text("txt_tool_output", "tool_output")
+            )
+            dpg.add_spacer(width=16)
+            dpg.add_button(
+                label=self._text("tool_clear"),
+                callback=self._make_dpg_callback(self._on_clear_tool_output_button),
+                tag=self._register_label("btn_tool_clear", "tool_clear"),
+            )
+        dpg.add_input_text(
+            multiline=True,
+            readonly=True,
+            width=730,
+            height=120,
+            tag=self._tool_result_tag,
+            default_value=self._text("tool_ready"),
+        )
+        dpg.add_text(
+            self._text("tool_progress"),
+            tag=self._register_text("txt_tool_progress", "tool_progress"),
+        )
+        dpg.add_progress_bar(default_value=0.0, width=730, tag=self._tool_progress_bar_tag)
+        dpg.add_text("", tag=self._tool_progress_text_tag)
+
     def _on_play_button(self) -> None:
         self._dispatch_action("play_pause", self._controller.on_play_pause)
 
@@ -1198,7 +1946,9 @@ class DearPyGuiPanel:
         frame = self._selected_marked_frame()
         if frame is None:
             return
-        self._dispatch_action("jump_marked_frame", lambda: self._controller.on_jump_marked_frame(int(frame)))
+        self._dispatch_action(
+            "jump_marked_frame", lambda: self._controller.on_jump_marked_frame(int(frame))
+        )
 
     def _on_ghost_toggle(self) -> None:
         self._dispatch_action("toggle_ghost", self._controller.on_toggle_ghost)
@@ -1215,7 +1965,9 @@ class DearPyGuiPanel:
     def _on_apply_dof_delta_button(self) -> None:
         if self._dpg is None:
             return
-        joint_idx = self._joint_index_from_combo_value(self._dpg.get_value(self._edit_joint_combo_tag))
+        joint_idx = self._joint_index_from_combo_value(
+            self._dpg.get_value(self._edit_joint_combo_tag)
+        )
         delta = float(self._dpg.get_value(self._edit_joint_delta_tag))
         propagate_radius = int(self._dpg.get_value(self._edit_propagate_tag))
         self._dispatch_action(
@@ -1235,10 +1987,12 @@ class DearPyGuiPanel:
         dx = float(self._dpg.get_value(self._ik_dx_tag))
         dy = float(self._dpg.get_value(self._ik_dy_tag))
         dz = float(self._dpg.get_value(self._ik_dz_tag))
+        self._apply_tool_progress(0.2, "tune: IK apply queued")
         self._dispatch_action(
             "apply_ik_target",
             lambda: self._controller.on_apply_ik_target(target_joint, dx, dy, dz),
         )
+        self._apply_tool_progress(1.0, "tune: IK apply dispatched")
 
     def _on_hud_toggle(self) -> None:
         self._dispatch_action("toggle_hud", self._controller.on_toggle_hud)
@@ -1355,7 +2109,9 @@ class DearPyGuiPanel:
             )
             self._attach_tooltip(dpg, "btn_next_100", "next_100")
 
-        dpg.add_text(self._text("section_modes"), tag=self._register_text("txt_modes", "section_modes"))
+        dpg.add_text(
+            self._text("section_modes"), tag=self._register_text("txt_modes", "section_modes")
+        )
         with dpg.group(horizontal=True):
             dpg.add_button(
                 label=self._text("toggle_loop"),
@@ -1379,7 +2135,9 @@ class DearPyGuiPanel:
             )
             self._attach_tooltip(dpg, "btn_hud", "toggle_hud")
 
-        dpg.add_text(self._text("section_speed"), tag=self._register_text("txt_speed", "section_speed"))
+        dpg.add_text(
+            self._text("section_speed"), tag=self._register_text("txt_speed", "section_speed")
+        )
         with dpg.group(horizontal=True):
             dpg.add_button(
                 label=self._text("speed_down"),
@@ -1441,10 +2199,15 @@ class DearPyGuiPanel:
             callback=self._make_dpg_value_callback(self._on_tune_reference_frame_changed),
         )
         self._attach_tooltip(dpg, self._ik_reference_frame_tag, "ik_reference_frame")
-        dpg.add_text(self._text("ik_current_pose"), tag=self._register_text("txt_ik_current_pose", "ik_current_pose"))
+        dpg.add_text(
+            self._text("ik_current_pose"),
+            tag=self._register_text("txt_ik_current_pose", "ik_current_pose"),
+        )
         dpg.add_text(
             self._text("ik_current_pose_line_placeholder"),
-            tag=self._register_text(self._ik_current_pose_line_tag, "ik_current_pose_line_placeholder"),
+            tag=self._register_text(
+                self._ik_current_pose_line_tag, "ik_current_pose_line_placeholder"
+            ),
             wrap=700,
         )
         dpg.add_text(
@@ -1453,7 +2216,10 @@ class DearPyGuiPanel:
             wrap=700,
             color=(170, 200, 220),
         )
-        dpg.add_text(self._text("ik_target_pose"), tag=self._register_text("txt_ik_target_pose", "ik_target_pose"))
+        dpg.add_text(
+            self._text("ik_target_pose"),
+            tag=self._register_text("txt_ik_target_pose", "ik_target_pose"),
+        )
         with dpg.group(horizontal=True):
             dpg.add_button(
                 label=self._text("mark_keyframe"),
@@ -1518,7 +2284,9 @@ class DearPyGuiPanel:
             wrap=720,
         )
 
-        dpg.add_text(self._text("section_editor"), tag=self._register_text("txt_editor", "section_editor"))
+        dpg.add_text(
+            self._text("section_editor"), tag=self._register_text("txt_editor", "section_editor")
+        )
         with dpg.group(horizontal=True):
             dpg.add_button(
                 label=self._text("undo_edit"),
@@ -1663,30 +2431,100 @@ class DearPyGuiPanel:
                 width=170,
                 tag=self._register_label(self._ik_step_angle_tag, "ik_step_angle"),
             )
-        dpg.add_text(self._text("tune_position_nudge"), tag=self._register_text("txt_tune_pos_nudge", "tune_position_nudge"))
-        with dpg.group(horizontal=True):
-            dpg.add_button(label="-X", callback=self._make_dpg_callback(lambda: self._on_tune_nudge_position(0, -1)))
-            dpg.add_button(label="+X", callback=self._make_dpg_callback(lambda: self._on_tune_nudge_position(0, 1)))
-            dpg.add_button(label="-Y", callback=self._make_dpg_callback(lambda: self._on_tune_nudge_position(1, -1)))
-            dpg.add_button(label="+Y", callback=self._make_dpg_callback(lambda: self._on_tune_nudge_position(1, 1)))
-            dpg.add_button(label="-Z", callback=self._make_dpg_callback(lambda: self._on_tune_nudge_position(2, -1)))
-            dpg.add_button(label="+Z", callback=self._make_dpg_callback(lambda: self._on_tune_nudge_position(2, 1)))
-        dpg.add_text(
-            self._text("tune_rotation_nudge"),
-            tag=self._register_text("txt_tune_rot_nudge", "tune_rotation_nudge"),
-        )
-        with dpg.group(horizontal=True):
-            dpg.add_button(label="-R", callback=self._make_dpg_callback(lambda: self._on_tune_nudge_rotation(0, -1)))
-            dpg.add_button(label="+R", callback=self._make_dpg_callback(lambda: self._on_tune_nudge_rotation(0, 1)))
-            dpg.add_button(label="-P", callback=self._make_dpg_callback(lambda: self._on_tune_nudge_rotation(1, -1)))
-            dpg.add_button(label="+P", callback=self._make_dpg_callback(lambda: self._on_tune_nudge_rotation(1, 1)))
-            dpg.add_button(label="-Y", callback=self._make_dpg_callback(lambda: self._on_tune_nudge_rotation(2, -1)))
-            dpg.add_button(label="+Y", callback=self._make_dpg_callback(lambda: self._on_tune_nudge_rotation(2, 1)))
+        self._build_tune_nudge_row(dpg)
         dpg.add_button(
             label=self._text("ik_apply_full_pose"),
             callback=self._make_dpg_callback(self._on_apply_ik_pose_button),
             tag=self._register_label("btn_apply_ik_pose_full", "ik_apply_full_pose"),
         )
+
+    def _build_tune_nudge_row(self, dpg: object) -> None:
+        with dpg.group(horizontal=True):
+            with dpg.group():
+                dpg.add_text(
+                    self._text("tune_position_nudge"),
+                    tag=self._register_text("txt_tune_pos_nudge", "tune_position_nudge"),
+                )
+                with dpg.group(horizontal=True):
+                    dpg.add_button(
+                        label="-X",
+                        callback=self._make_dpg_callback(
+                            lambda: self._on_tune_nudge_position(0, -1)
+                        ),
+                    )
+                    dpg.add_button(
+                        label="+X",
+                        callback=self._make_dpg_callback(
+                            lambda: self._on_tune_nudge_position(0, 1)
+                        ),
+                    )
+                    dpg.add_button(
+                        label="-Y",
+                        callback=self._make_dpg_callback(
+                            lambda: self._on_tune_nudge_position(1, -1)
+                        ),
+                    )
+                    dpg.add_button(
+                        label="+Y",
+                        callback=self._make_dpg_callback(
+                            lambda: self._on_tune_nudge_position(1, 1)
+                        ),
+                    )
+                    dpg.add_button(
+                        label="-Z",
+                        callback=self._make_dpg_callback(
+                            lambda: self._on_tune_nudge_position(2, -1)
+                        ),
+                    )
+                    dpg.add_button(
+                        label="+Z",
+                        callback=self._make_dpg_callback(
+                            lambda: self._on_tune_nudge_position(2, 1)
+                        ),
+                    )
+            dpg.add_spacer(width=24)
+            with dpg.group():
+                dpg.add_text(
+                    self._text("tune_rotation_nudge"),
+                    tag=self._register_text("txt_tune_rot_nudge", "tune_rotation_nudge"),
+                )
+                with dpg.group(horizontal=True):
+                    dpg.add_button(
+                        label="-R",
+                        callback=self._make_dpg_callback(
+                            lambda: self._on_tune_nudge_rotation(0, -1)
+                        ),
+                    )
+                    dpg.add_button(
+                        label="+R",
+                        callback=self._make_dpg_callback(
+                            lambda: self._on_tune_nudge_rotation(0, 1)
+                        ),
+                    )
+                    dpg.add_button(
+                        label="-P",
+                        callback=self._make_dpg_callback(
+                            lambda: self._on_tune_nudge_rotation(1, -1)
+                        ),
+                    )
+                    dpg.add_button(
+                        label="+P",
+                        callback=self._make_dpg_callback(
+                            lambda: self._on_tune_nudge_rotation(1, 1)
+                        ),
+                    )
+                    dpg.add_button(
+                        label="-Y",
+                        callback=self._make_dpg_callback(
+                            lambda: self._on_tune_nudge_rotation(2, -1)
+                        ),
+                    )
+                    dpg.add_button(
+                        label="+Y",
+                        callback=self._make_dpg_callback(
+                            lambda: self._on_tune_nudge_rotation(2, 1)
+                        ),
+                    )
 
     def _build_metrics_tab(self, dpg: object) -> None:
         dpg.add_input_text(
@@ -1783,7 +2621,10 @@ class DearPyGuiPanel:
         )
 
     def _build_audio_tab(self, dpg: object) -> None:
-        dpg.add_text(self._text("audio_placeholder"), tag=self._register_text("txt_audio_placeholder", "audio_placeholder"))
+        dpg.add_text(
+            self._text("audio_placeholder"),
+            tag=self._register_text("txt_audio_placeholder", "audio_placeholder"),
+        )
         with dpg.group(horizontal=True):
             dpg.add_button(
                 label=self._text("audio_play"),
@@ -1801,22 +2642,12 @@ class DearPyGuiPanel:
                 tag=self._register_label("btn_audio_stop", "audio_stop"),
             )
 
-    def _build_tool_output_panel(self, dpg: object) -> None:
-        dpg.add_separator()
-        dpg.add_text(self._text("tool_output"), tag=self._register_text("txt_tool_output", "tool_output"))
-        dpg.add_input_text(
-            multiline=True,
-            readonly=True,
-            width=730,
-            height=120,
-            tag=self._tool_result_tag,
-            default_value=self._text("tool_ready"),
-        )
-
     def _run_blocking(self) -> None:
+        self._last_runtime_error = None
         try:
             import dearpygui.dearpygui as dpg  # type: ignore[import]
         except ImportError:
+            self._last_runtime_error = "dearpygui import failed"
             return
 
         self._dpg = dpg
@@ -1826,7 +2657,6 @@ class DearPyGuiPanel:
             context_created = True
             self._install_fonts(dpg)
             dpg.bind_theme(self._create_theme(dpg))
-            monitor_card_theme = self._create_monitor_card_theme(dpg)
 
             with dpg.window(
                 label=self._text("window_title"),
@@ -1836,7 +2666,7 @@ class DearPyGuiPanel:
             ):
                 with dpg.group(horizontal=True):
                     dpg.add_text(self._text("hero_title"), tag=self._hero_title_tag)
-                    dpg.add_spacer(width=60)
+                    dpg.add_spacer(width=32)
                     dpg.add_text(self._text("language_label"), tag=self._language_text_tag)
                     dpg.add_combo(
                         items=list(self._LANGUAGE_OPTIONS.keys()),
@@ -1845,6 +2675,15 @@ class DearPyGuiPanel:
                         tag=self._language_combo_tag,
                         callback=self._make_dpg_value_callback(self._on_language_changed),
                     )
+                    dpg.add_spacer(width=16)
+                    dpg.add_text(self._text("font_size_label"), tag=self._font_size_text_tag)
+                    dpg.add_combo(
+                        items=self._font_size_items(),
+                        default_value=self._font_size_label(self._font_size_key),
+                        width=130,
+                        tag=self._font_size_combo_tag,
+                        callback=self._make_dpg_value_callback(self._on_font_size_changed),
+                    )
                 dpg.add_text(self._text("hero_subtitle"), tag=self._hero_subtitle_tag)
                 with dpg.group(horizontal=True):
                     dpg.add_text(
@@ -1852,16 +2691,11 @@ class DearPyGuiPanel:
                         tag=self._register_text("txt_status_label", "status_label"),
                     )
                     dpg.add_text(self._text("status_idle"), tag=self._status_text_tag)
-                with dpg.child_window(
-                    height=124,
-                    border=True,
-                    tag=self._monitor_card_tag,
-                ):
-                    dpg.add_text(self._text("monitor_label"), tag=self._monitor_title_tag, color=(95, 200, 255))
-                    dpg.add_text(self._text("monitor_line_1_placeholder"), tag=self._monitor_line_1_tag, wrap=650)
-                    dpg.add_text(self._text("monitor_line_2_placeholder"), tag=self._monitor_line_2_tag, wrap=650)
-                    dpg.add_text(self._text("monitor_line_3_placeholder"), tag=self._monitor_line_3_tag, wrap=650)
-                dpg.add_separator()
+                with dpg.group(tag=self._status_dock_container_tag):
+                    self._build_status_dock(
+                        dpg,
+                        parent=self._status_dock_container_tag,
+                    )
 
                 with dpg.tab_bar(tag=self._workbench_tabbar_tag):
                     for tab_id in TAB_IDS:
@@ -1880,12 +2714,10 @@ class DearPyGuiPanel:
                                 self._build_export_tab(dpg)
                             else:
                                 self._build_audio_tab(dpg)
-                self._build_tool_output_panel(dpg)
-
-                dpg.bind_item_theme(self._monitor_card_tag, monitor_card_theme)
 
             dpg.create_viewport(title=self._text("window_title"), width=780, height=680)
             dpg.setup_dearpygui()
+            dpg.configure_app(manual_callback_management=True)
             dpg.set_viewport_resize_callback(
                 self._make_dpg_value_callback(self._on_viewport_resized_dpg)
             )
@@ -1893,16 +2725,36 @@ class DearPyGuiPanel:
             self._sync_tune_inputs_from_state()
             self._apply_monitor_card_layout()
             dpg.show_viewport()
+            self._emit_process_status(self._process_status_callback, "ready")
             while dpg.is_dearpygui_running():
+                self._drain_dpg_callback_queue()
+                self._drain_ui_commands()
+                self._drain_tool_events()
+                self._process_font_intents()
+                self._reconcile_font_size_combo_display()
                 self._refresh_monitor_lines()
                 dpg.render_dearpygui_frame()
                 self._maybe_export_visual_qa_artifacts()
         except Exception as exc:  # noqa: BLE001
+            self._last_runtime_error = str(exc)
             logger.exception("DearPyGui panel loop crashed: %s", exc)
         finally:
             if context_created:
                 dpg.destroy_context()
             self._dpg = None
+            self._applied_font_size_key = None
+
+    @staticmethod
+    def _emit_process_status(
+        status_callback: Callable[[str], None] | None,
+        message: str,
+    ) -> None:
+        if status_callback is None:
+            return
+        try:
+            status_callback(message)
+        except Exception:  # noqa: BLE001
+            logger.debug("Panel process status callback failed", exc_info=True)
 
     def launch_non_blocking(self) -> None:
         """Start panel loop in a background daemon thread."""
@@ -1915,3 +2767,23 @@ class DearPyGuiPanel:
     def run_blocking(self) -> None:
         """Run panel loop in foreground thread until window is closed."""
         self._run_blocking()
+
+    def run_process_entry(
+        self,
+        status_callback: Callable[[str], None] | None = None,
+    ) -> int:
+        """Run panel loop with subprocess-friendly status reporting."""
+        self._emit_process_status(status_callback, "starting")
+        self._process_status_callback = status_callback
+        try:
+            self._run_blocking()
+        except Exception as exc:  # pragma: no cover
+            self._emit_process_status(status_callback, f"failed:{exc}")
+            return 1
+        finally:
+            self._process_status_callback = None
+        if self._last_runtime_error is not None:
+            self._emit_process_status(status_callback, f"failed:{self._last_runtime_error}")
+            return 1
+        self._emit_process_status(status_callback, "stopped")
+        return 0
