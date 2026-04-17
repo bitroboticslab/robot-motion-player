@@ -51,6 +51,12 @@ gui = [
 video = [
     "imageio>=2.34",
 ]
+all = [
+    "mujoco>=3.0",
+    "pin>=2.6",          # pinocchio Python bindings (conda: pinocchio)
+    "dearpygui>=1.11",
+    "imageio>=2.34",
+]
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
