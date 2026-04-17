@@ -93,8 +93,7 @@ class MuJoCoViewer:
             import mujoco.viewer  # type: ignore[import]
         except ImportError as exc:
             raise ImportError(
-                "mujoco package is required for MuJoCoViewer. "
-                "Install it with: pip install mujoco"
+                "mujoco package is required for MuJoCoViewer. Install it with: pip install mujoco"
             ) from exc
 
         self._mujoco = mujoco
@@ -715,7 +714,9 @@ class MuJoCoViewer:
         target_idx = joint_names.index(target_joint)
         body_id = int(self._driver.dof_joint_body_id(target_idx))
         current_pos = np.asarray(self._driver.data.xpos[body_id], dtype=np.float64)
-        current_quat = np.asarray(getattr(self._driver.data, "xquat", np.array([[1.0, 0.0, 0.0, 0.0]])), dtype=np.float64)
+        current_quat = np.asarray(
+            getattr(self._driver.data, "xquat", np.array([[1.0, 0.0, 0.0, 0.0]])), dtype=np.float64
+        )
         if body_id >= current_quat.shape[0]:
             current_quat_wxyz = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
         else:

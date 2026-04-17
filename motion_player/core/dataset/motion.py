@@ -80,13 +80,13 @@ class StandardMotion:
     """
 
     fps: float
-    root_pos: np.ndarray            # (N, 3)   world frame, metres
-    root_rot: np.ndarray            # (N, 4)   xyzw scalar-last
-    dof_pos: np.ndarray             # (N, D)   radians
-    dof_vel: np.ndarray             # (N, D)   rad/s
-    projected_gravity: np.ndarray   # (N, 3)   root-local
-    root_lin_vel: np.ndarray        # (N, 3)   root-local m/s
-    root_ang_vel: np.ndarray        # (N, 3)   root-local rad/s
+    root_pos: np.ndarray  # (N, 3)   world frame, metres
+    root_rot: np.ndarray  # (N, 4)   xyzw scalar-last
+    dof_pos: np.ndarray  # (N, D)   radians
+    dof_vel: np.ndarray  # (N, D)   rad/s
+    projected_gravity: np.ndarray  # (N, 3)   root-local
+    root_lin_vel: np.ndarray  # (N, 3)   root-local m/s
+    root_ang_vel: np.ndarray  # (N, 3)   root-local rad/s
     key_body_pos_local: np.ndarray  # (N, K*3) root-local metres
     joint_names: list[str] | None = None
     source_path: str | None = None
@@ -136,16 +136,12 @@ class StandardMotion:
         for attr, shape in expected.items():
             arr = getattr(self, attr)
             if arr.shape != shape:
-                raise ValueError(
-                    f"StandardMotion.{attr}: expected shape {shape}, "
-                    f"got {arr.shape}"
-                )
+                raise ValueError(f"StandardMotion.{attr}: expected shape {shape}, got {arr.shape}")
         # key_body_pos_local: first dim must be N, second must be multiple of 3
         kbl = self.key_body_pos_local
         if kbl.shape[0] != n:
             raise ValueError(
-                f"StandardMotion.key_body_pos_local: first dim must be {n}, "
-                f"got {kbl.shape[0]}"
+                f"StandardMotion.key_body_pos_local: first dim must be {n}, got {kbl.shape[0]}"
             )
         if kbl.shape[1] % 3 != 0:
             raise ValueError(

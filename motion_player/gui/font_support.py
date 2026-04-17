@@ -37,3 +37,15 @@ def resolve_cjk_font(candidates: Iterable[Path]) -> Path | None:
         if candidate.exists():
             return candidate
     return None
+
+
+def resolve_ui_font(
+    cjk_candidates: Iterable[Path], fallback_candidates: Iterable[Path]
+) -> Path | None:
+    cjk = resolve_cjk_font(cjk_candidates)
+    if cjk is not None:
+        return cjk
+    for candidate in fallback_candidates:
+        if candidate.exists():
+            return candidate
+    return None

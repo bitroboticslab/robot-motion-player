@@ -59,6 +59,13 @@ def test_all_required_gui_i18n_keys_have_en_and_zh_entries() -> None:
         "audio_stop",
         "tune_position_nudge",
         "tune_rotation_nudge",
+        "font_size_label",
+        "font_size_small",
+        "font_size_medium",
+        "font_size_large",
+        "font_size_xlarge",
+        "tool_clear",
+        "tool_progress",
     ]
     missing = [k for k in required if k not in panel._I18N["en"] or k not in panel._I18N["zh"]]
     assert missing == []

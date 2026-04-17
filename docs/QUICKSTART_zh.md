@@ -24,6 +24,9 @@ motion_player play --motion path/to/clip.pkl --robot path/to/robot.xml --gui
 motion_player gui --motion path/to/clip.pkl --robot path/to/robot.xml
 ```
 
+`motion_player gui` 现在默认优先使用面板隔离进程模式。
+若面板启动失败，运行时会打印告警并自动回退到 MuJoCo 键盘控制模式。
+
 ## 3）常用按键
 
 - `Space`：播放/暂停
@@ -41,11 +44,14 @@ motion_player gui --motion path/to/clip.pkl --robot path/to/robot.xml
 控制面板仍可覆盖全部键盘映射操作（`±1/10/100` 步进、循环/乒乓、
 保存、HUD 开关、速度 ±、片段切换、退出）。
 每个交互控件均支持悬停提示，可说明该操作的含义。
-控制台状态监控现采用独立高可见度运行卡片，实时展示播放与模式状态，便于新手一边控制一边监控。
+状态停靠区将运行监控、输出日志和进度显示合并在一起，便于快速查看播放状态。
 Tune 分栏支持全姿态 IK 数值编辑（位置 + 朝向）、单位切换（`m / cm / mm`、`rad / deg`）
 与步长微调按钮，便于精确调参。
 Tune 工作流采用双层数据流：`Current Pose`（运行态只读）与 `Target Pose`（可编辑输入），
 并提供 `Reference Frame`（`world` / 局部坐标）显式切换。
+高分辨率屏幕可使用 GUI 顶部 `字号` 选择器（位于 `语言` 旁）调整显示大小；
+若没有可用的 CJK 字体，界面会回退到可读的平台字体。
+输出菜单提供 `清空` 操作，导出进度条按逐帧渲染进度更新。
 当前 IK 说明请参考 [IK 使用说明](IK_USAGE.md)。
 
 GUI 可视化质检命令（桌面会话）：
@@ -106,3 +112,4 @@ motion_player export \
 - `Motion path not found` / `Robot model path not found`：检查路径是否真实存在。
 - 中文标签显示为 `???`：请安装 CJK 字体，并设置 `RMP_GUI_FONT=/absolute/path/to/font.ttf`。
 - 若 GUI 启动出现 DearPyGui 字体范围错误，请升级到最新补丁版本，并确保 `RMP_GUI_FONT` 指向有效的 CJK 字体文件。
+- 若 GUI 启动提示面板进程失败，说明当前已进入 viewer-only 回退模式，播放仍可继续。

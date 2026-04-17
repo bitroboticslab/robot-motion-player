@@ -41,7 +41,9 @@ class PinocchioUrdfIKBackend:
         return quat / n
 
     @classmethod
-    def _quat_delta_to_rotvec(cls, q_target_wxyz: np.ndarray, q_current_wxyz: np.ndarray) -> np.ndarray:
+    def _quat_delta_to_rotvec(
+        cls, q_target_wxyz: np.ndarray, q_current_wxyz: np.ndarray
+    ) -> np.ndarray:
         qt = cls._normalize_quat(q_target_wxyz)
         qc = cls._normalize_quat(q_current_wxyz)
         w1, x1, y1, z1 = qt
@@ -188,7 +190,9 @@ class PinocchioUrdfIKBackend:
                 rot_cur = np.asarray(getattr(transform, "rotation", np.eye(3)), dtype=np.float64)
                 q_cur = PinocchioUrdfIKBackend._rotmat_to_quat_wxyz(rot_cur)
                 pos_err = target.position_m - p_cur
-                rot_err = PinocchioUrdfIKBackend._quat_delta_to_rotvec(target.orientation_wxyz, q_cur)
+                rot_err = PinocchioUrdfIKBackend._quat_delta_to_rotvec(
+                    target.orientation_wxyz, q_cur
+                )
                 if np.linalg.norm(pos_err) < 1e-4 and np.linalg.norm(rot_err) < 1e-4:
                     break
 

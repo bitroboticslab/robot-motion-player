@@ -58,8 +58,12 @@ def rotate_point_wxyz(quat_wxyz: np.ndarray, point_xyz: np.ndarray) -> np.ndarra
     return p + q[0] * t + np.cross(q_vec, t)
 
 
-def transform_point(parent_pos: np.ndarray, parent_quat_wxyz: np.ndarray, point_local: np.ndarray) -> np.ndarray:
-    return np.asarray(parent_pos, dtype=np.float64) + rotate_point_wxyz(parent_quat_wxyz, point_local)
+def transform_point(
+    parent_pos: np.ndarray, parent_quat_wxyz: np.ndarray, point_local: np.ndarray
+) -> np.ndarray:
+    return np.asarray(parent_pos, dtype=np.float64) + rotate_point_wxyz(
+        parent_quat_wxyz, point_local
+    )
 
 
 def invert_pose(pos_w: np.ndarray, quat_wxyz: np.ndarray) -> tuple[np.ndarray, np.ndarray]:

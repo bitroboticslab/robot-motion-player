@@ -203,7 +203,9 @@ def test_set_speed_command_clamps_speed() -> None:
 def test_set_edit_joint_command_clamps_and_updates_state() -> None:
     viewer = MuJoCoViewer.__new__(MuJoCoViewer)
     viewer._state = PlayerState(frame=0, selected_joint_idx=0)
-    viewer._editor_sessions = [types.SimpleNamespace(motion=types.SimpleNamespace(num_dofs=4, joint_names=None))]
+    viewer._editor_sessions = [
+        types.SimpleNamespace(motion=types.SimpleNamespace(num_dofs=4, joint_names=None))
+    ]
     viewer._motions = [types.SimpleNamespace(num_frames=20, fps=30.0, num_dofs=4, joint_names=None)]
     viewer._driver = _DummyDriver()
     viewer._dispatcher = CommandDispatcher(viewer._state)
@@ -216,7 +218,9 @@ def test_set_edit_joint_command_clamps_and_updates_state() -> None:
 def test_marked_frame_navigation_commands_seek_with_wrap() -> None:
     class _EditorStub:
         def __init__(self) -> None:
-            self.motion = types.SimpleNamespace(num_frames=30, fps=30.0, num_dofs=2, joint_names=["j0", "j1"])
+            self.motion = types.SimpleNamespace(
+                num_frames=30, fps=30.0, num_dofs=2, joint_names=["j0", "j1"]
+            )
             self._keys = [2, 8, 14]
 
         def next_marked_frame(self, frame: int, wrap: bool = True) -> int | None:
@@ -302,7 +306,9 @@ def test_apply_ik_payload_calls_editor_session() -> None:
         def __init__(self) -> None:
             self.ik_solver = object()
             self.calls: list[tuple[int, dict[str, PoseTarget]]] = []
-            self.motion = types.SimpleNamespace(num_frames=20, fps=30.0, num_dofs=1, joint_names=["joint_0"])
+            self.motion = types.SimpleNamespace(
+                num_frames=20, fps=30.0, num_dofs=1, joint_names=["joint_0"]
+            )
 
         def apply_eef_edit(
             self,
@@ -315,16 +321,22 @@ def test_apply_ik_payload_calls_editor_session() -> None:
     viewer = MuJoCoViewer.__new__(MuJoCoViewer)
     viewer._state = PlayerState(frame=5, selected_joint_idx=0)
     viewer._editor_sessions = [_EditorStub()]
-    viewer._motions = [types.SimpleNamespace(num_frames=20, fps=30.0, num_dofs=1, joint_names=["joint_0"])]
+    viewer._motions = [
+        types.SimpleNamespace(num_frames=20, fps=30.0, num_dofs=1, joint_names=["joint_0"])
+    ]
     viewer._driver = _DummyDriver()
-    viewer._driver.data = types.SimpleNamespace(xpos=np.array([[0, 0, 0], [1, 1, 1]], dtype=np.float64))
+    viewer._driver.data = types.SimpleNamespace(
+        xpos=np.array([[0, 0, 0], [1, 1, 1]], dtype=np.float64)
+    )
     viewer._driver.dof_joint_body_id = lambda _idx: 1
 
     viewer._handle_apply_ik_payload({"target_joint": "joint_0", "dx": 0.1, "dy": 0.0, "dz": 0.0})
     assert len(viewer._editor_sessions[0].calls) == 1
     _frame, targets, propagate_radius = viewer._editor_sessions[0].calls[0]
     assert propagate_radius == 0
-    np.testing.assert_allclose(targets["joint_0"].position_m, np.array([1.1, 1.0, 1.0], dtype=np.float64))
+    np.testing.assert_allclose(
+        targets["joint_0"].position_m, np.array([1.1, 1.0, 1.0], dtype=np.float64)
+    )
     np.testing.assert_allclose(targets["joint_0"].orientation_wxyz, np.array([1.0, 0.0, 0.0, 0.0]))
 
 
@@ -333,7 +345,9 @@ def test_apply_ik_payload_accepts_full_pose_payload() -> None:
         def __init__(self) -> None:
             self.ik_solver = object()
             self.seen = None
-            self.motion = types.SimpleNamespace(num_frames=20, fps=30.0, num_dofs=1, joint_names=["joint_0"])
+            self.motion = types.SimpleNamespace(
+                num_frames=20, fps=30.0, num_dofs=1, joint_names=["joint_0"]
+            )
 
         def apply_eef_edit(
             self,
@@ -346,9 +360,13 @@ def test_apply_ik_payload_accepts_full_pose_payload() -> None:
     viewer = MuJoCoViewer.__new__(MuJoCoViewer)
     viewer._state = PlayerState(frame=7, selected_joint_idx=0)
     viewer._editor_sessions = [_Editor()]
-    viewer._motions = [types.SimpleNamespace(num_frames=20, fps=30.0, num_dofs=1, joint_names=["joint_0"])]
+    viewer._motions = [
+        types.SimpleNamespace(num_frames=20, fps=30.0, num_dofs=1, joint_names=["joint_0"])
+    ]
     viewer._driver = _DummyDriver()
-    viewer._driver.data = types.SimpleNamespace(xpos=np.array([[0, 0, 0], [1, 1, 1]], dtype=np.float64))
+    viewer._driver.data = types.SimpleNamespace(
+        xpos=np.array([[0, 0, 0], [1, 1, 1]], dtype=np.float64)
+    )
     viewer._driver.dof_joint_body_id = lambda _idx: 1
     viewer._handle_apply_ik_payload(
         {
@@ -369,7 +387,9 @@ def test_apply_ik_payload_local_frame_is_converted_to_world() -> None:
         def __init__(self) -> None:
             self.ik_solver = object()
             self.seen = None
-            self.motion = types.SimpleNamespace(num_frames=20, fps=30.0, num_dofs=1, joint_names=["joint_0"])
+            self.motion = types.SimpleNamespace(
+                num_frames=20, fps=30.0, num_dofs=1, joint_names=["joint_0"]
+            )
 
         def apply_eef_edit(
             self,
@@ -382,7 +402,9 @@ def test_apply_ik_payload_local_frame_is_converted_to_world() -> None:
     viewer = MuJoCoViewer.__new__(MuJoCoViewer)
     viewer._state = PlayerState(frame=7, selected_joint_idx=0)
     viewer._editor_sessions = [_Editor()]
-    viewer._motions = [types.SimpleNamespace(num_frames=20, fps=30.0, num_dofs=1, joint_names=["joint_0"])]
+    viewer._motions = [
+        types.SimpleNamespace(num_frames=20, fps=30.0, num_dofs=1, joint_names=["joint_0"])
+    ]
     viewer._driver = _DummyDriver()
     viewer._driver.data = types.SimpleNamespace(
         xpos=np.array([[0.0, 0.0, 0.0], [1.0, 2.0, 3.0]], dtype=np.float64),
@@ -399,10 +421,14 @@ def test_apply_ik_payload_local_frame_is_converted_to_world() -> None:
     )
     assert viewer._editor_sessions[0].seen is not None
     _frame, targets, _radius = viewer._editor_sessions[0].seen
-    np.testing.assert_allclose(targets["joint_0"].position_m, np.array([1.1, 2.0, 3.0], dtype=np.float64), atol=1e-6)
+    np.testing.assert_allclose(
+        targets["joint_0"].position_m, np.array([1.1, 2.0, 3.0], dtype=np.float64), atol=1e-6
+    )
 
 
-def test_undo_redo_without_history_logs_hint_and_keeps_running(caplog: pytest.LogCaptureFixture) -> None:
+def test_undo_redo_without_history_logs_hint_and_keeps_running(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     class _EditorEmpty:
         def undo(self) -> None:
             raise IndexError("Nothing to undo.")

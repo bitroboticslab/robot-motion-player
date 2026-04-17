@@ -84,15 +84,15 @@ class MetricConfig:
     w_amp_feature_stability: float = 1.0
     w_dof_vel_distribution: float = 1.0
     w_joint_limit_violation: float = 1.0  # matches GMR w_joint_limit
-    w_foot_penetration: float = 1.0       # matches GMR w_foot_ground
+    w_foot_penetration: float = 1.0  # matches GMR w_foot_ground
     w_com_height: float = 0.5
-    w_joint_acc: float = 0.5             # matches GMR w_smoothness
+    w_joint_acc: float = 0.5  # matches GMR w_smoothness
     w_joint_jerk: float = 0.2
 
     # --- Thresholds (for PerFrameScore.bad_frames) ---
-    joint_limit_threshold: float = 0.01   # radians
+    joint_limit_threshold: float = 0.01  # radians
     foot_penetration_threshold: float = 0.01  # metres below ground
-    joint_acc_threshold: float = 50.0     # rad/s²
+    joint_acc_threshold: float = 50.0  # rad/s²
 
     # --- Joint limits ---
     joint_lower_limits: np.ndarray | None = None  # (D,)
@@ -118,8 +118,8 @@ class MetricConfig:
     )
 
     # --- DOF velocity reference distribution ---
-    dof_vel_mean: np.ndarray | None = None   # (D,)
-    dof_vel_std: np.ndarray | None = None    # (D,)
+    dof_vel_mean: np.ndarray | None = None  # (D,)
+    dof_vel_std: np.ndarray | None = None  # (D,)
     dof_vel_sigma_threshold: float = 3.0
 
 
@@ -141,9 +141,7 @@ class MetricEngine:
     ) -> None:
         self.motion = motion
         self.config = config or MetricConfig()
-        self._custom_terms: dict[
-            str, tuple[Callable[[StandardMotion], PerFrameScore], float]
-        ] = {}
+        self._custom_terms: dict[str, tuple[Callable[[StandardMotion], PerFrameScore], float]] = {}
 
     # ------------------------------------------------------------------
     # Extension point: custom terms
@@ -197,7 +195,7 @@ class MetricEngine:
                 weight=self.config.w_amp_feature_stability,
             )
         feat = np.concatenate(parts, axis=1)  # (N, F)
-        delta = np.diff(feat, axis=0)          # (N-1, F)
+        delta = np.diff(feat, axis=0)  # (N-1, F)
         norms = np.linalg.norm(delta, axis=1)  # (N-1,)
         # Pad first frame with zero for uniform length
         values = np.concatenate([[0.0], norms])
@@ -217,19 +215,11 @@ class MetricEngine:
         (``MetricConfig.dof_vel_mean/std``), the clip's own mean/std is used.
         """
         dv = self.motion.dof_vel  # (N, D)
-        mean = (
-            self.config.dof_vel_mean
-            if self.config.dof_vel_mean is not None
-            else dv.mean(axis=0)
-        )
-        std = (
-            self.config.dof_vel_std
-            if self.config.dof_vel_std is not None
-            else dv.std(axis=0)
-        )
+        mean = self.config.dof_vel_mean if self.config.dof_vel_mean is not None else dv.mean(axis=0)
+        std = self.config.dof_vel_std if self.config.dof_vel_std is not None else dv.std(axis=0)
         # Avoid division by zero
         safe_std = np.where(std < 1e-6, 1.0, std)
-        z = np.abs(dv - mean) / safe_std       # (N, D)
+        z = np.abs(dv - mean) / safe_std  # (N, D)
         # Count outlier joints per frame
         outlier_count = (z > self.config.dof_vel_sigma_threshold).sum(axis=1)
         return PerFrameScore(
@@ -267,8 +257,8 @@ class MetricEngine:
 
         lo = np.asarray(lo)
         hi = np.asarray(hi)
-        violation_lo = np.maximum(0.0, lo - dof)   # (N, D)
-        violation_hi = np.maximum(0.0, dof - hi)   # (N, D)
+        violation_lo = np.maximum(0.0, lo - dof)  # (N, D)
+        violation_hi = np.maximum(0.0, dof - hi)  # (N, D)
         per_frame = (violation_lo + violation_hi).sum(axis=1)  # (N,)
         return PerFrameScore(
             "joint_limit_violation",
@@ -339,11 +329,11 @@ class MetricEngine:
         High values indicate jitter that degrades both AMP discriminator
         performance and visual quality.  Mirrors GMR ``smoothness_penalty``.
         """
-        dof = self.motion.dof_pos        # (N, D)
+        dof = self.motion.dof_pos  # (N, D)
         dt = self.motion.dt
         vel = np.diff(dof, axis=0) / dt  # (N-1, D)
         acc = np.diff(vel, axis=0) / dt  # (N-2, D)
-        rms = np.sqrt((acc ** 2).mean(axis=1))  # (N-2,)
+        rms = np.sqrt((acc**2).mean(axis=1))  # (N-2,)
         # Pad to length N
         values = np.concatenate([[0.0, 0.0], rms]).astype(np.float32)
         return PerFrameScore(
@@ -359,8 +349,8 @@ class MetricEngine:
         dt = self.motion.dt
         vel = np.diff(dof, axis=0) / dt
         acc = np.diff(vel, axis=0) / dt
-        jerk = np.diff(acc, axis=0) / dt   # (N-3, D)
-        rms = np.sqrt((jerk ** 2).mean(axis=1))
+        jerk = np.diff(acc, axis=0) / dt  # (N-3, D)
+        rms = np.sqrt((jerk**2).mean(axis=1))
         values = np.concatenate([[0.0, 0.0, 0.0], rms]).astype(np.float32)
         return PerFrameScore(
             "joint_jerk",
@@ -423,9 +413,7 @@ class MetricEngine:
         total_weight = sum(s.weight for s in scores.values())
         if total_weight < 1e-12:
             return 0.0
-        weighted_sum = sum(
-            s.weight * (s.summary or 0.0) for s in scores.values()
-        )
+        weighted_sum = sum(s.weight * (s.summary or 0.0) for s in scores.values())
         return weighted_sum / total_weight
 
     # ------------------------------------------------------------------
@@ -473,9 +461,7 @@ class MetricEngine:
                 writer = csv.writer(f)
                 writer.writerow(["frame"] + list(scores.keys()))
                 for i in range(self.motion.num_frames):
-                    row = [i] + [
-                        float(score.values[i]) for score in scores.values()
-                    ]
+                    row = [i] + [float(score.values[i]) for score in scores.values()]
                     writer.writerow(row)
         else:
             raise ValueError(f"Unknown format '{fmt}'; use 'json' or 'csv'.")

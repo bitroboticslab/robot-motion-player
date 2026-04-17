@@ -177,19 +177,13 @@ class DatasetLoader:
             with open(path, "rb") as f:
                 return pickle.load(f)  # noqa: S301
         else:
-            raise ValueError(
-                f"Unsupported file extension '{suffix}'; expected .npy or .pkl"
-            )
+            raise ValueError(f"Unsupported file extension '{suffix}'; expected .npy or .pkl")
 
-    def _parse_dict(
-        self, raw: dict, source_path: str | None = None
-    ) -> StandardMotion:
+    def _parse_dict(self, raw: dict, source_path: str | None = None) -> StandardMotion:
         """Convert a raw dict to a ``StandardMotion``."""
         missing = _REQUIRED_KEYS - set(raw.keys())
         if missing:
-            raise KeyError(
-                f"Motion file is missing required keys: {sorted(missing)}"
-            )
+            raise KeyError(f"Motion file is missing required keys: {sorted(missing)}")
 
         fps = float(raw["fps"])
         root_pos = np.asarray(raw["root_pos"], dtype=np.float32)
@@ -208,11 +202,7 @@ class DatasetLoader:
         # Always normalise quaternions to unit length
         root_rot = normalize(root_rot.astype(np.float64)).astype(np.float32)
 
-        joint_names: list[str] | None = (
-            list(raw["joint_names"])
-            if "joint_names" in raw
-            else None
-        )
+        joint_names: list[str] | None = list(raw["joint_names"]) if "joint_names" in raw else None
         motion_weight = float(raw.get("motion_weight", 1.0))
 
         return StandardMotion(

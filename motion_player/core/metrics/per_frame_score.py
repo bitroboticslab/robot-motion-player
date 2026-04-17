@@ -43,7 +43,7 @@ class PerFrameScore:
     """
 
     term_name: str
-    values: np.ndarray   # (N,)
+    values: np.ndarray  # (N,)
     weight: float = 1.0
     summary: float | None = None
     threshold: float | None = None

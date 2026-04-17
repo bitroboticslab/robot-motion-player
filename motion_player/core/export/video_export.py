@@ -45,13 +45,20 @@ def export_video_with_renderer(
     out_fps: float,
     render_frame: Callable[[int], np.ndarray],
     output_path: str | Path,
+    progress_callback: Callable[[int, int], None] | None = None,
 ) -> Path:
     """Render sampled frames and encode to gif/mp4."""
     path = Path(output_path)
     frame_ids = _frame_schedule(num_frames=num_frames, src_fps=src_fps, out_fps=out_fps)
     if not frame_ids:
         raise ValueError("No source frames available for export.")
-    _encode_video(path=path, frame_ids=frame_ids, render_frame=render_frame, fps=out_fps)
+    _encode_video(
+        path=path,
+        frame_ids=frame_ids,
+        render_frame=render_frame,
+        fps=out_fps,
+        progress_callback=progress_callback,
+    )
     return path
 
 
@@ -61,6 +68,7 @@ def _encode_video(
     frame_ids: list[int],
     render_frame: Callable[[int], np.ndarray],
     fps: float,
+    progress_callback: Callable[[int, int], None] | None = None,
 ) -> None:
     suffix = path.suffix.lower()
     if suffix not in (".gif", ".mp4"):
@@ -77,12 +85,15 @@ def _encode_video(
         writer_kwargs["format"] = "GIF"
     writer = imageio.get_writer(str(path), **writer_kwargs)
     try:
-        for frame_idx in frame_ids:
+        total = len(frame_ids)
+        for done, frame_idx in enumerate(frame_ids, start=1):
             frame = np.asarray(render_frame(frame_idx), dtype=np.uint8)
             if frame.ndim != 3 or frame.shape[2] not in (3, 4):
                 raise ValueError(
                     f"render_frame({frame_idx}) must return HxWx3/4 uint8 image, got {frame.shape}"
                 )
             writer.append_data(frame[:, :, :3])
+            if progress_callback is not None:
+                progress_callback(done, total)
     finally:
         writer.close()

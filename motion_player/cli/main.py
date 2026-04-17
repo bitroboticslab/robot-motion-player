@@ -46,10 +46,24 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+_FONT_SIZE_CHOICES: tuple[str, ...] = ("small", "medium", "large", "xlarge")
+
+
+def _resolve_gui_font_size_key(cli_value: str | None) -> str:
+    if isinstance(cli_value, str):
+        token = cli_value.strip().lower()
+        if token in _FONT_SIZE_CHOICES:
+            return token
+    env_value = os.getenv("RMP_GUI_FONT_SIZE", "").strip().lower()
+    if env_value in _FONT_SIZE_CHOICES:
+        return env_value
+    return "medium"
 
 
 def _cmd_play(args: argparse.Namespace) -> int:
@@ -83,8 +97,7 @@ def _cmd_play(args: argparse.Namespace) -> int:
 
         if not IsaacBackend.is_available():
             print(
-                "Isaac backend is not available in this environment; "
-                "falling back to MuJoCo.",
+                "Isaac backend is not available in this environment; falling back to MuJoCo.",
                 file=sys.stderr,
             )
             selected_backend = "mujoco"
@@ -121,6 +134,10 @@ def _cmd_play(args: argparse.Namespace) -> int:
                     backend=selected_backend,
                     require_panel=False,
                     warn_if_panel_unavailable=True,
+                    prefer_isolated=False,
+                    initial_font_size_key=_resolve_gui_font_size_key(
+                        getattr(args, "font_size", None)
+                    ),
                 )
 
             from motion_player.backends.mujoco_backend.state_driver import MuJoCoStateDriver
@@ -180,10 +197,7 @@ def _cmd_metrics(args: argparse.Namespace) -> int:
     print(f"Overall score: {engine.overall_score():.4f}  (lower is better)")
     for name, score in scores.items():
         bad = len(score.bad_frames)
-        print(
-            f"  {name:<35} summary={score.summary:.4f}  "
-            f"bad_frames={bad}"
-        )
+        print(f"  {name:<35} summary={score.summary:.4f}  bad_frames={bad}")
 
     if args.output:
         fmt = "csv" if args.output.endswith(".csv") else "json"
@@ -269,6 +283,7 @@ def _cmd_export(args: argparse.Namespace) -> int:
                     driver=driver,
                     frame_idx=frame_idx,
                 ),
+                progress_callback=getattr(args, "progress_callback", None),
             )
         finally:
             if hasattr(renderer, "close"):
@@ -292,13 +307,29 @@ def _cmd_gui(args: argparse.Namespace) -> int:
         return 1
 
     try:
-        return run_backend_connected_gui(
+        runtime_rc = run_backend_connected_gui(
             motion=str(args.motion),
             robot=str(args.robot),
             root_joint=args.root_joint or "root",
             backend=args.backend,
-            require_panel=True,
+            require_panel=False,
+            warn_if_panel_unavailable=True,
+            prefer_isolated=True,
+            initial_font_size_key=_resolve_gui_font_size_key(getattr(args, "font_size", None)),
         )
+        if int(runtime_rc) == 0:
+            return 0
+        if int(runtime_rc) in {139, -11}:
+            print(
+                "Full GUI runtime terminated abnormally (signal-like exit code).",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                f"Full GUI runtime exited with code {int(runtime_rc)}.",
+                file=sys.stderr,
+            )
+        return 1
     except (ImportError, RuntimeError, ValueError, OSError, FileNotFoundError, KeyError) as exc:
         print(f"Failed to launch full GUI mode: {exc}", file=sys.stderr)
         return 1
@@ -315,8 +346,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="motion_player",
         description=(
-            "robot-motion-player — cross-platform AMP motion dataset "
-            "visualiser & editor."
+            "robot-motion-player — cross-platform AMP motion dataset visualiser & editor."
         ),
     )
     parser.add_argument(
@@ -342,9 +372,14 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["mujoco", "isaac"],
         default="mujoco",
         help=(
-            "Rendering backend. 'isaac' is minimal in v0.1 and "
-            "falls back to MuJoCo if unavailable."
+            "Rendering backend. 'isaac' is minimal in v0.1 and falls back to MuJoCo if unavailable."
         ),
+    )
+    p_play.add_argument(
+        "--font-size",
+        choices=list(_FONT_SIZE_CHOICES),
+        default=None,
+        help="Startup GUI font size key for --gui mode (runtime combo still overrides).",
     )
 
     # --- audit ---
@@ -383,14 +418,24 @@ def build_parser() -> argparse.ArgumentParser:
 
     # --- gui ---
     p_gui = subparsers.add_parser("gui", help="Launch full-feature GUI workbench.")
-    p_gui.add_argument("--motion", default=None, help="Optional default motion path for GUI tool tabs.")
-    p_gui.add_argument("--robot", default=None, help="Optional default robot path for GUI tool tabs.")
+    p_gui.add_argument(
+        "--motion", default=None, help="Optional default motion path for GUI tool tabs."
+    )
+    p_gui.add_argument(
+        "--robot", default=None, help="Optional default robot path for GUI tool tabs."
+    )
     p_gui.add_argument("--root-joint", default="root", help="Name of the root free joint.")
     p_gui.add_argument(
         "--backend",
         choices=["mujoco"],
         default="mujoco",
         help="Rendering backend for full GUI mode.",
+    )
+    p_gui.add_argument(
+        "--font-size",
+        choices=list(_FONT_SIZE_CHOICES),
+        default=None,
+        help="Startup GUI font size key (runtime combo still overrides).",
     )
 
     return parser
@@ -423,7 +468,7 @@ def _get_version() -> str:
         return version("robot-motion-player")
     except PackageNotFoundError:
         logger.debug("Package metadata not found, using dev version.")
-        return "0.7.0.dev0"
+        return "0.8.0.dev0"
 
 
 if __name__ == "__main__":

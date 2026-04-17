@@ -26,5 +26,6 @@ def test_reset_target_from_current_copies_position() -> None:
     state.set_current_position_m((0.4, -0.1, 0.9))
     state.target_position_m = np.array([0.0, 0.0, 0.0], dtype=np.float64)
     state.reset_target_from_current()
-    np.testing.assert_allclose(state.target_position_m, np.array([0.4, -0.1, 0.9], dtype=np.float64))
-
+    np.testing.assert_allclose(
+        state.target_position_m, np.array([0.4, -0.1, 0.9], dtype=np.float64)
+    )

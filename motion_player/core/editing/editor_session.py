@@ -87,13 +87,17 @@ class EditorSession:
                 return int(marked)
         return int(self._keyframes[-1]) if wrap else None
 
-    def apply_dof_edit(self, frame: int, joint_idx: int, delta: float, propagate_radius: int = 0) -> None:
+    def apply_dof_edit(
+        self, frame: int, joint_idx: int, delta: float, propagate_radius: int = 0
+    ) -> None:
         self.frame_editor.edit_dof(frame=frame, joint_idx=joint_idx, delta=delta, push_history=True)
         if propagate_radius <= 0:
             return
         delta_vec = np.zeros(self.motion.num_dofs, dtype=self.motion.dof_pos.dtype)
         delta_vec[joint_idx] = delta
-        self._propagate_with_keyframe_guards(anchor_frame=frame, delta_dof=delta_vec, radius=propagate_radius)
+        self._propagate_with_keyframe_guards(
+            anchor_frame=frame, delta_dof=delta_vec, radius=propagate_radius
+        )
 
     def undo(self) -> None:
         self.frame_editor.undo()
@@ -113,7 +117,9 @@ class EditorSession:
         current = self.motion.dof_pos[frame].astype(np.float64)
         solved = np.asarray(self.ik_solver.solve(current, targets), dtype=np.float64)
         if solved.shape != current.shape:
-            raise ValueError(f"IK solve shape mismatch: expected {current.shape}, got {solved.shape}")
+            raise ValueError(
+                f"IK solve shape mismatch: expected {current.shape}, got {solved.shape}"
+            )
         self.frame_editor.snapshot()
         self.motion.dof_pos[frame] = solved.astype(self.motion.dof_pos.dtype)
         if propagate_radius > 0:
@@ -137,7 +143,9 @@ class EditorSession:
         DatasetLoader(validate=False).save(self.motion, out, fmt=fmt)
         return out
 
-    def _propagate_with_keyframe_guards(self, anchor_frame: int, delta_dof: np.ndarray, radius: int) -> None:
+    def _propagate_with_keyframe_guards(
+        self, anchor_frame: int, delta_dof: np.ndarray, radius: int
+    ) -> None:
         end = min(anchor_frame + radius + 1, self.motion.num_frames)
         blocked = set(self._keyframes) - {anchor_frame}
         for frame in range(anchor_frame + 1, end):

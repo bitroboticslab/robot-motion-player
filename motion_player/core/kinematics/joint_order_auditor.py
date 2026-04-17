@@ -113,9 +113,7 @@ class JointOrderAuditor:
                 jnt_type = model.jnt_type[i]
                 # mujoco.mjtJoint.mjJNT_FREE == 0; skip free joints
                 if jnt_type != 0:
-                    name = mujoco.mj_id2name(
-                        model, mujoco.mjtObj.mjOBJ_JOINT, i
-                    )
+                    name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_JOINT, i)
                     if name:
                         names.append(name)
             return names
@@ -254,9 +252,7 @@ class JointOrderAuditor:
         """
         self._strategies[name] = fn
 
-    def apply_strategy(
-        self, name: str, motion: StandardMotion, **kwargs
-    ) -> StandardMotion:
+    def apply_strategy(self, name: str, motion: StandardMotion, **kwargs) -> StandardMotion:
         """Apply a registered repair strategy.
 
         Parameters
@@ -269,8 +265,5 @@ class JointOrderAuditor:
             Passed through to the strategy function.
         """
         if name not in self._strategies:
-            raise KeyError(
-                f"Unknown strategy '{name}'. "
-                f"Available: {list(self._strategies)}"
-            )
+            raise KeyError(f"Unknown strategy '{name}'. Available: {list(self._strategies)}")
         return self._strategies[name](motion, **kwargs)

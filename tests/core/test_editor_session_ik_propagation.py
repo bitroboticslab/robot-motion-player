@@ -32,4 +32,3 @@ def test_apply_eef_edit_propagates_decay_to_following_frames() -> None:
     assert motion.dof_pos[5, 0] > base[5, 0]
     assert motion.dof_pos[9, 0] > base[9, 0]
     assert abs(float(motion.dof_pos[20, 0] - base[20, 0])) < 1e-6
-
