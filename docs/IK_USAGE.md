@@ -20,6 +20,18 @@ Both runtime backend paths (`.xml` MuJoCo and `.urdf` Pinocchio when installed) 
 
 Unit conversion is done only at the UI/payload boundary.
 
+## GUI Startup Font Size (v0.8.0)
+
+For GUI entry commands, startup font-size can be set with `--font-size`:
+
+```bash
+motion_player play --motion <clip.pkl> --robot <robot.xml> --gui --font-size large
+motion_player gui --motion <clip.pkl> --robot <robot.xml> --font-size xlarge
+```
+
+Supported values are `small`, `medium`, `large`, `xlarge`.
+You can set `RMP_GUI_FONT_SIZE` as the default startup selection.
+
 ## GUI Workflow
 
 Use either:

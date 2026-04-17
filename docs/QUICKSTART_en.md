@@ -27,6 +27,23 @@ motion_player gui --motion path/to/clip.pkl --robot path/to/robot.xml
 `motion_player gui` now prefers an isolated panel process mode. If panel startup fails,
 the runtime prints a warning and continues in MuJoCo keyboard-only mode.
 
+### v0.8.0 GUI startup font-size controls
+
+Use startup font-size selection when launching GUI entry commands:
+
+```bash
+motion_player play --motion path/to/clip.pkl --robot path/to/robot.xml --gui --font-size large
+motion_player gui --motion path/to/clip.pkl --robot path/to/robot.xml --font-size xlarge
+```
+
+You can also set a default via environment variable:
+
+```bash
+export RMP_GUI_FONT_SIZE=medium
+```
+
+Supported values: `small`, `medium`, `large`, `xlarge`.
+
 ## 3) Essential keys
 
 - `Space`: play/pause
@@ -54,16 +71,6 @@ For high-resolution displays, use the GUI header `Font Size` selector (next to `
 if no CJK font is available, the panel falls back to the best readable platform font.
 The output menu provides a `Clear` action, and export progress advances per rendered frame.
 For details, see [IK Usage Guide](IK_USAGE.md).
-
-GUI visual QA command (desktop session):
-
-```bash
-RMP_GUI_SNAPSHOT_OUT=/tmp/rmp-monitor-card.png \
-RMP_GUI_LAYOUT_REPORT_OUT=/tmp/rmp-monitor-card-layout.json \
-motion_player play --motion path/to/clip.pkl --robot path/to/robot.xml --gui
-```
-
-Expected report field in `/tmp/rmp-monitor-card-layout.json`: `"fits_all_lines": true`.
 
 ## 4) Generate quality report
 
@@ -102,7 +109,7 @@ Notes:
 motion_player export \
   --motion path/to/clip.pkl \
   --robot path/to/robot.xml \
-  --output /tmp/clip.gif \
+  --output clip.gif \
   --fps 20
 ```
 

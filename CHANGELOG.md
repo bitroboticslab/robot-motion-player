@@ -11,13 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Added startup font-size controls for GUI entry commands via `--font-size` (`small|medium|large|xlarge`) with environment fallback `RMP_GUI_FONT_SIZE`.
+- Added OSS governance baseline guidance via `CLAUDE.md` and OSS-focused release checks.
 
 ### Changed
 - Refactored GUI font-size handling to track per-size availability and reject unavailable selections with explicit status feedback.
+- Updated OSS quickstart and IK docs to align with v0.8.0 font-size startup behavior.
 
 ### Fixed
 - Fixed persistent runtime font-size issue where only `small` effectively applied when higher-size font handles were unavailable.
 - Hardened font installation to fail per size instead of aborting the full font registry initialization path.
+- Updated OSS docs/release tests to validate OSS-owned artifacts only.
 
 ## [0.7.9] - 2026-04-15
 

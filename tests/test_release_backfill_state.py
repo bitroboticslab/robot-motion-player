@@ -1,23 +1,34 @@
-"""Release tag map and backfill-script consistency checks."""
-
-from __future__ import annotations
+"""OSS release governance checks."""
 
 from pathlib import Path
 
-
-def test_release_map_covers_v040_to_v052() -> None:
-    text = Path("docs/releases/RELEASE_TAG_MAP.md").read_text(encoding="utf-8")
-    for tag in ("v0.4.0", "v0.4.1", "v0.5.0", "v0.5.1", "v0.5.2"):
-        assert f"| {tag} |" in text
-
-
-def test_backfill_script_lists_v040_to_v052() -> None:
-    text = Path("scripts/release/backfill_releases.sh").read_text(encoding="utf-8")
-    for tag in ("v0.4.0", "v0.4.1", "v0.5.0", "v0.5.1", "v0.5.2"):
-        assert tag in text
+PRIVATE_RELEASE_PATHS = (
+    Path("docs/releases"),
+    Path("scripts/release/backfill_releases.sh"),
+)
 
 
-def test_release_note_files_exist_for_v040_to_v052() -> None:
-    for tag in ("v0.4.0", "v0.4.1", "v0.5.0", "v0.5.1", "v0.5.2"):
-        path = Path(f"docs/releases/{tag}.md")
-        assert path.exists()
+def test_private_release_artifacts_are_not_present_in_oss() -> None:
+    for path in PRIVATE_RELEASE_PATHS:
+        assert not path.exists(), f"private-only artifact should be absent in OSS: {path}"
+
+
+def test_releasing_guide_targets_oss_artifacts() -> None:
+    text = Path("RELEASING.md").read_text(encoding="utf-8")
+
+    assert "CHANGELOG.md" in text
+    assert "docs/QUICKSTART_en.md" in text
+    assert "docs/QUICKSTART_zh.md" in text
+    assert "docs/IK_USAGE.md" in text
+    assert "docs/releases" not in text
+    assert "backfill_releases.sh" not in text
+
+
+def test_make_release_check_uses_oss_tests() -> None:
+    text = Path("Makefile").read_text(encoding="utf-8")
+
+    assert "release-check" in text
+    assert "tests/test_docs_version_state.py" in text
+    assert "tests/test_release_backfill_state.py" in text
+    assert "tests/test_roadmap_versions.py" in text
+    assert "scripts/release/check_release_markers.py" not in text
