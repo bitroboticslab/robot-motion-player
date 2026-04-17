@@ -1,4 +1,4 @@
-.PHONY: help install-dev lint test test-quick check precommit release-check
+.PHONY: help install-dev lint test test-quick check precommit release release-check
 
 .DEFAULT_GOAL := help
 
@@ -25,6 +25,8 @@ check: lint test ## Run lint and tests
 
 precommit: ## Run pre-commit on all files
 	pre-commit run --all-files
+
+release: release-check ## Run release validation gates
 
 release-check: lint test ## Run OSS release checks
 	$(PYTEST) -q tests/test_docs_version_state.py tests/test_release_backfill_state.py tests/test_roadmap_versions.py
