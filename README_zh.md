@@ -1,9 +1,9 @@
 <div align="center">
   <img src="assets/banner.png" alt="Robot Motion Player" width="100%"/>
 
-  # Robot Motion Player
+  # 机器人运动播放器
 
-  **Visualise • Tune • Validate Robot Motion Data**
+  **可视化 • 调试 • 验证机器人运动数据**
 
   [![CI Status][ci-badge]][ci-url]
   [![License][license-badge]](LICENSE)
@@ -17,42 +17,38 @@
 
 ---
 
-## Overview
+## 概述
+Robot Motion Player是一款独立、跨平台的Python工具，用于机器人运动数据集的可视化、编辑和质量评估，支持AMP格式数据和全身轨迹优化结果。
 
-Robot Motion Player is a standalone, cross-platform Python tool for visualizing, editing, and quality assessment of robot motion datasets. It supports AMP-format data and whole-body trajectory optimization results.
+**核心能力：**
+- 🎬 **播放**：优先基于MuJoCo的实时运动回放
+- 🎚️ **IK调试**：6D末端执行器位姿调整
+- 📊 **指标计算**：对齐AMP标准的质量评估
+- ✏️ **编辑**：关键帧安全的轨迹编辑
+- 🔄 **格式转换**：URDF/XML格式互相转换
+- 📤 **导出**：GIF/视频输出
 
-**Key capabilities:**
-
-- 🎬 **Playback** — MuJoCo-first real-time motion playback
-- 🎚️ **IK Tuning** — 6D end-effector pose adjustment
-- 📊 **Metrics** — AMP-aligned quality evaluation
-- ✏️ **Editing** — Keyframe-safe trajectory editing
-- 🔄 **Convert** — URDF/XML format conversion
-- 📤 **Export** — GIF/Video output
-
-**Use cases:**
-
-- AMP locomotion learning pipeline (GMR → rsl-rl-ex → training)
-- Trajectory optimization visualization and debugging
-- Motion data quality control before expensive GPU training
-- Robot motion algorithm development
+**使用场景：**
+- AMP locomotion学习流水线（GMR → rsl-rl-ex → 训练）
+- 轨迹优化可视化和调试
+- 昂贵GPU训练前的运动数据质量控制
+- 机器人运动算法开发
 
 ---
 
-## Demo
-
+## 功能演示
 <table>
 <tr>
-<td width="50%" align="center"><b>Playback + Control</b></td>
-<td width="50%" align="center"><b>IK Tuning</b></td>
+<td width="50%" align="center"><b>播放 + 控制</b></td>
+<td width="50%" align="center"><b>IK调试</b></td>
 </tr>
 <tr>
 <td><img src="assets/demo/playback.gif" width="100%"></td>
 <td><img src="assets/demo/ik_tuning.gif" width="100%"></td>
 </tr>
 <tr>
-<td align="center"><b>Metrics Report</b></td>
-<td align="center"><b>GUI Workbench</b></td>
+<td align="center"><b>指标报告</b></td>
+<td align="center"><b>GUI工作台</b></td>
 </tr>
 <tr>
 <td><img src="assets/demo/metrics.gif" width="100%"></td>
@@ -62,17 +58,16 @@ Robot Motion Player is a standalone, cross-platform Python tool for visualizing,
 
 ---
 
-## Features
-
-| Module | Features | Status |
+## 功能列表
+| 模块 | 功能 | 状态 |
 |--------|----------|--------|
-| 📽️ **Playback** | Real-time playback, keyboard control, marked frames | ✅ |
-| 🎚️ **IK Tuning** | 6D target pose, unit-aware controls, Jacobian-based | ✅ |
-| 📊 **Metrics** | AMP quality terms, GMR loss parity, JSON/CSV export | ✅ |
-| ✏️ **Editing** | Frame/segment editing, undo/redo, cross-frame propagation | ✅ |
-| 🔄 **Convert** | URDF↔XML, MuJoCo format support | ✅ |
-| 📤 **Export** | GIF, MP4, frame sequences | ✅ |
-| 🖥️ **GUI** | Full workbench with tabs (Play/Tune/Metrics/Audit) | ✅ |
+| 📽️ **播放** | 实时回放、键盘控制、帧标记 | ✅ |
+| 🎚️ **IK调试** | 6D目标位姿、单位感知控制、基于雅可比计算 | ✅ |
+| 📊 **指标计算** | AMP质量项、GMR损失对齐、JSON/CSV导出 | ✅ |
+| ✏️ **编辑** | 帧/片段编辑、撤销/重做、跨帧传播 | ✅ |
+| 🔄 **格式转换** | URDF↔XML、MuJoCo格式支持 | ✅ |
+| 📤 **导出** | GIF、MP4、帧序列 | ✅ |
+| 🖥️ **GUI** | 全功能工作台（播放/调试/指标/审计） | ✅ |
 
 ---
 
@@ -97,10 +92,8 @@ pip install -e ".[all,dev]"
 pre-commit install
 ```
 
-### From Scripts (Linux, macOS, Windows)
-
-For a smoother setup experience, platform-specific scripts are provided:
-
+### 脚本安装（Linux、macOS、Windows）
+为了更顺畅的安装体验，提供了平台专用安装脚本：
 ```bash
 # Linux
 chmod +x scripts/setup_linux.sh
@@ -114,38 +107,37 @@ bash scripts/setup_mac.sh
 scripts\setup_windows.bat
 ```
 
-### From Source Manually (Linux, macOS, Windows)
-
+### 手动源码安装（全平台通用）
 ```bash
 git clone https://github.com/bitroboticslab/robot-motion-player.git
 cd robot-motion-player
 conda create -n rmp python=3.11 -y
 conda activate rmp
-# recommended for windows to avoid compile from scratch
+# Windows用户推荐安装conda版pinocchio避免编译
 conda install -c conda-forge pinocchio
 pip install -e ".[all]"
 ```
 
-## Quick Start
+---
 
-### Try with Example Data
-
+## ⚡ 快速开始
+### 使用示例数据体验
 ```bash
-# Clone repository
+# 克隆仓库
 git clone https://github.com/bitroboticslab/robot-motion-player.git
 cd robot-motion-player
 
-# Basic playback
+# 基础播放
 motion_player play \
   --motion example/standard_dataset/run1_subject5_standard.pkl \
   --robot example/robots/booster_t1/T1_23dof.xml
 
-# GUI mode
+# GUI模式
 motion_player gui \
   --motion example/standard_dataset/run1_subject5_standard.pkl \
   --robot example/robots/booster_t1/T1_23dof.xml
 
-# Quality metrics
+# 生成质量报告
 motion_player metrics \
   --motion example/standard_dataset/run1_subject5_standard.pkl \
   --output report.json
@@ -153,34 +145,28 @@ motion_player metrics \
 
 ---
 
-## Documentation
-
-- 📖 [Quick Start Guide](docs/QUICKSTART_en.md)
-- 📖 [快速上手](docs/QUICKSTART_zh.md)
-- 📖 [IK Usage Guide](docs/IK_USAGE.md)
+## 📖 文档
+- [快速上手指南](docs/QUICKSTART_zh.md)
+- [IK使用指南](docs/IK_USAGE.md)
 
 ---
 
-## Integration
-
-Robot Motion Player is designed to integrate with:
-
-| Project | Role |
+## 生态集成
+Robot Motion Player设计支持与以下项目集成：
+| 项目 | 作用 |
 |---------|------|
-| [GMR](https://github.com/YanjieZe/GMR) | Human-to-robot motion retargeting |
-| [rsl-rl-ex](https://github.com/Mr-tooth/rsl-rl-ex) | AMP dataset building and training |
-| [Pinocchio](https://github.com/stack-of-tasks/pinocchio) | IK backend (optional) |
+| [GMR](https://github.com/YanjieZe/GMR) | 人体到机器人运动重定向 |
+| [rsl-rl-ex](https://github.com/Mr-tooth/rsl-rl-ex) | AMP数据集构建和训练 |
+| [Pinocchio](https://github.com/stack-of-tasks/pinocchio) | IK后端（可选） |
 
 ---
 
-## Citing
-
-If you use Robot Motion Player in your research, please cite:
-
+## 引用
+如果您在研究中使用了Robot Motion Player，请引用：
 ```bibtex
 @software{rmp2026,
   author = {Lai, Junhang and contributors},
-  title = {Robot Motion Player: A Visualizer and Editor for Robot Motion Data},
+  title = {Robot Motion Player: A Visualiser and Editor for Robot Motion Data},
   howpublished = {https://github.com/bitroboticslab/robot-motion-player},
   year = {2026}
 }
@@ -188,24 +174,21 @@ If you use Robot Motion Player in your research, please cite:
 
 ---
 
-## Contributing
-
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
----
-
-## License
-
-Apache 2.0 — see [LICENSE](LICENSE).
+## 贡献
+欢迎贡献代码！请查看[CONTRIBUTING.md](CONTRIBUTING.md)了解贡献指南。
 
 ---
 
-## Acknowledgments
+## 许可
+本项目采用Apache 2.0许可，详情见[LICENSE](LICENSE)文件。
 
-Built upon the shoulders of:
-- [Pinocchio](https://github.com/stack-of-tasks/pinocchio) — Rigid body dynamics
-- [MuJoCo](https://github.com/google-deepmind/mujoco) — Physics simulation
-- [GMR](https://github.com/YanjieZe/GMR) — Motion retargeting
+---
+
+## 致谢
+本项目基于以下优秀开源项目构建：
+- [Pinocchio](https://github.com/stack-of-tasks/pinocchio) — 刚体动力学计算
+- [MuJoCo](https://github.com/google-deepmind/mujoco) — 物理仿真
+- [GMR](https://github.com/YanjieZe/GMR) — 运动重定向
 
 <!-- Links -->
 [ci-badge]: https://github.com/bitroboticslab/robot-motion-player/actions/workflows/ci.yml/badge.svg
