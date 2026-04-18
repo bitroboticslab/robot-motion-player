@@ -176,7 +176,7 @@ A: 请确保你在克隆的仓库根目录下运行命令，或者为 `--motion`
 ### Q3: GUI 启动失败或显示黑屏？
 A: 确保你的系统支持 OpenGL 3.3+。无桌面的服务器环境可以使用 `xvfb-run` 在虚拟显示器中运行 GUI 命令：`xvfb-run motion_player gui ...`
 ### Q4: 导出视频/GIF失败？
-A: 需要安装系统依赖：导出视频需要 `ffmpeg`，导出GIF需要 `imagemagick`。
+A: 安装必要系统依赖：导出视频需要 `ffmpeg`，GIF导出使用内置PIL库，不需要额外系统依赖。
 ### Q5: Windows 环境下中文路径报错？
 A: 将仓库移动到不包含中文的路径下，或者升级 Python 版本到 3.11+。
 

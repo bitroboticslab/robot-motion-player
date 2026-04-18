@@ -11,12 +11,15 @@ We welcome all contributions to Robot Motion Player! This document outlines the 
    - Bugfix branches: `fix/your-bugfix-name`
    - Documentation branches: `docs/your-doc-name`
 3. **Make your changes** following the code standards below
-4. **Run checks locally** before submitting PR:
+4. **✅ MANDATORY: Run full local checks using official make commands BEFORE submitting PR**
+   We strictly enforce using Makefile commands for consistency across all environments, DO NOT run lint/test manually:
    ```bash
-   make lint    # Run all pre-commit checks
-   make test    # Run full test suite
-   make check   # Run both lint and test
+   make check   # Run all required checks in one go (lint + full test suite)
+   # Or run separately if you need to debug:
+   make lint    # Run all pre-commit formatting & static analysis checks
+   make test    # Run full unit test suite
    ```
+   *All checks must pass before PR submission. CI runs exactly the same Makefile commands, so if it passes locally it will pass CI.*
 5. **Commit your changes** with clear and descriptive commit messages following [Conventional Commits](https://www.conventionalcommits.org/) standard:
    - `feat: add X feature`
    - `fix: resolve Y bug`

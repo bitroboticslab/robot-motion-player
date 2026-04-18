@@ -187,7 +187,7 @@ A: Make sure you are running the command from the root of the cloned repository,
 ### Q3: GUI fails to start or shows black screen?
 A: Ensure you have OpenGL 3.3+ support. For headless servers, use `xvfb-run` to run GUI commands in virtual display: `xvfb-run motion_player gui ...`
 ### Q4: Video/GIF export fails?
-A: Install required system dependencies: `ffmpeg` (for video) and `imagemagick` (for GIF) are needed for export functionality.
+A: Install required system dependency: `ffmpeg` (required for video export). GIF export uses built-in PIL library and has no extra system dependencies.
 ### Q5: Chinese path errors on Windows?
 A: Move the repository to a path without Chinese characters, or upgrade your Python version to 3.11+.
 
