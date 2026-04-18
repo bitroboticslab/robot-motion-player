@@ -76,8 +76,8 @@ Robot Motion Player is a standalone, cross-platform Python tool for visualizing,
 
 ---
 
-## 📦 安装方式
-> PyPI版本正在审核上线中，当前推荐使用源码安装：
+## 📦 Installation
+> PyPI packages are pending approval, source installation is recommended for now:
 
 ### 用户安装（直接使用）
 ```bash
