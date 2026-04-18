@@ -1,17 +1,13 @@
 ---
-name: 功能请求
-about: 建议新功能或者改进现有功能
-title: "[Feature] 功能描述"
+name: Feature Request
+about: Suggest new features or improve existing ones
+title: "[Feature] Brief description of the feature"
 labels: enhancement
 assignees: ''
-
 ---
-
-### 功能描述
-清晰简洁地描述你想要的功能。
-
-### 使用场景
-说明这个功能的使用场景，为什么需要它。
-
-### 实现建议
-如果你有实现思路，可以在这里描述，我们会参考。
+### Feature Description
+Clear and concise description of the desired feature.
+### Use Case
+Explain the use case for this feature and why it is needed.
+### Implementation Suggestions
+If you have ideas for implementation, describe them here for reference.

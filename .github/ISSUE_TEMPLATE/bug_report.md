@@ -1,28 +1,23 @@
 ---
-name: Bug 报告
-about: 报告运行过程中遇到的问题
-title: "[Bug] 问题描述"
+name: Bug Report
+about: Report issues encountered during runtime
+title: "[Bug] Brief description of the problem"
 labels: bug
 assignees: ''
-
 ---
-
-### 问题描述
-清晰简洁地描述遇到的问题。
-
-### 复现步骤
-1. 运行命令：`...`
-2. 触发操作：...
-3. 看到错误：
+### Description
+Clear and concise description of the issue.
+### Reproduction Steps
+1. Run command: `...`
+2. Trigger operation: ...
+3. Error observed:
 ```
-请粘贴完整错误日志
+Paste full error log here
 ```
-
-### 环境信息
-- 操作系统：[e.g. Ubuntu 22.04 / macOS 13 / Windows 11]
-- Python版本：[e.g. 3.11]
-- RMP版本：[e.g. 0.8.0]
-- 安装方式：[源码安装 / pip安装]
-
-### 额外信息
-如果有相关截图、运动文件或者机器人模型，可以在这里附上。
+### Environment Information
+- Operating System: [e.g. Ubuntu 22.04 / macOS 13 / Windows 11]
+- Python Version: [e.g. 3.11]
+- RMP Version: [e.g. 0.8.0]
+- Installation Method: [Source install / pip install]
+### Additional Information
+Attach related screenshots, motion files, or robot models if applicable.

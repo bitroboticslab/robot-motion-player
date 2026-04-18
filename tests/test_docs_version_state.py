@@ -49,7 +49,7 @@ def test_readme_references_oss_docs_only() -> None:
     readme = Path("README.md").read_text(encoding="utf-8")
 
     assert "[English](README.md)" in readme
-    assert "[中文](docs/QUICKSTART_zh.md)" in readme
+    assert "[中文](README_zh.md)" in readme
     assert "docs/QUICKSTART_en.md" in readme
     assert "docs/IK_USAGE.md" in readme
     assert "README_CN.md" not in readme

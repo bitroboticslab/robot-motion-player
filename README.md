@@ -12,7 +12,7 @@
   [![GitHub Forks][fork-badge]][fork-url]
   [![Contributors][contrib-badge]][contrib-url]
 
-  [English](README.md) | [中文](docs/QUICKSTART_zh.md)
+  [English](README.md) | [中文](README_zh.md)
 </div>
 
 ---
