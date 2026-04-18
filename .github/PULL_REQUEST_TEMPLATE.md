@@ -1,18 +1,22 @@
-### 变更说明
-清晰简洁地描述本次PR的变更内容：
-1. ...
-2. ...
-
-### 变更类型
-- [ ] Bug修复
-- [ ] 新功能开发
-- [ ] 文档更新
-- [ ] 工程化配置更新
-- [ ] 其他改进
-
-### 检查清单
-- [ ] 已运行`make lint`，代码符合规范
-- [ ] 已运行`make test`，所有测试通过
-- [ ] 已更新相关文档（如果涉及功能变更）
-- [ ] 已添加必要的测试用例（如果是新增功能）
-- [ ] 变更后功能运行正常
+### Description
+Clear and concise description of the changes in this PR:
+1. What does this change do?
+2. Why is this change needed?
+3. Link related issues (if any): Fixes #<issue-number>
+---
+### Type of Change
+Please check the applicable options:
+- [ ] 🐛 Bug fix (non-breaking change that fixes an issue)
+- [ ] ✨ New feature (non-breaking change that adds functionality)
+- [ ] 📝 Documentation update (only changes to documentation)
+- [ ] 🔨 Refactoring (code change that does not affect functionality)
+- [ ] ⚠️ Breaking change (fix or feature that would cause existing functionality to not work as expected)
+- [ ] Other (describe below):
+---
+### Checklist
+All items must be completed before PR review:
+- [ ] I have run `make check` locally and all checks pass
+- [ ] I have added/updated tests that prove my fix is effective or my feature works
+- [ ] I have updated relevant documentation (README, docs, etc.) to reflect my changes
+- [ ] My changes generate no new warnings
+- [ ] I have checked that my code follows the project's style guidelines
