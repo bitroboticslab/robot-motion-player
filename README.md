@@ -79,14 +79,14 @@ Robot Motion Player is a standalone, cross-platform Python tool for visualizing,
 ## 📦 Installation
 > PyPI packages are pending approval, source installation is recommended for now:
 
-### 用户安装（直接使用）
+### User Installation (Direct Usage)
 ```bash
 git clone https://github.com/bitroboticslab/robot-motion-player.git
 cd robot-motion-player
 pip install ".[all]"
 ```
 
-### 开发者安装（参与贡献）
+### Developer Installation (For Contributors)
 ```bash
 git clone https://github.com/bitroboticslab/robot-motion-player.git
 cd robot-motion-player
@@ -162,7 +162,7 @@ motion_player metrics \
 ## Documentation
 
 - 📖 [Quick Start Guide](docs/QUICKSTART_en.md)
-- 📖 [快速上手](docs/QUICKSTART_zh.md)
+- 📖 [Chinese Quick Start Guide](docs/QUICKSTART_zh.md)
 - 📖 [IK Usage Guide](docs/IK_USAGE.md)
 
 ---
