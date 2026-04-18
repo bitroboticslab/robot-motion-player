@@ -127,6 +127,12 @@ pip install -e ".[all]"
 ```
 
 ## Quick Start
+### 🚀 2-Line Quick Run
+```bash
+git clone https://github.com/bitroboticslab/robot-motion-player.git && cd robot-motion-player
+pip install ".[all]" && motion_player gui --motion example/standard_dataset/run1_subject5_standard.pkl --robot example/robots/booster_t1/T1_23dof.xml
+```
+
 
 ### Try with Example Data
 
@@ -172,6 +178,18 @@ Robot Motion Player is designed to integrate with:
 | [Pinocchio](https://github.com/stack-of-tasks/pinocchio) | IK backend (optional) |
 
 ---
+
+## ❓ Frequently Asked Questions
+### Q1: Installation fails with Pinocchio related errors?
+A: We recommend using Conda to install Pinocchio first: `conda install -c conda-forge pinocchio` before running `pip install`. For Windows users, this avoids compilation errors entirely.
+### Q2: Runtime error "file not found" for motion/robot files?
+A: Make sure you are running the command from the root of the cloned repository, or use absolute paths for the `--motion` and `--robot` parameters.
+### Q3: GUI fails to start or shows black screen?
+A: Ensure you have OpenGL 3.3+ support. For headless servers, use `xvfb-run` to run GUI commands in virtual display: `xvfb-run motion_player gui ...`
+### Q4: Video/GIF export fails?
+A: Install required system dependencies: `ffmpeg` (for video) and `imagemagick` (for GIF) are needed for export functionality.
+### Q5: Chinese path errors on Windows?
+A: Move the repository to a path without Chinese characters, or upgrade your Python version to 3.11+.
 
 ## Citing
 

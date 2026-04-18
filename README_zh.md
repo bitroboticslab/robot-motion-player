@@ -121,6 +121,12 @@ pip install -e ".[all]"
 ---
 
 ## ⚡ 快速开始
+### 🚀 2 行命令极速体验
+```bash
+git clone https://github.com/bitroboticslab/robot-motion-player.git && cd robot-motion-player
+pip install ".[all]" && motion_player gui --motion example/standard_dataset/run1_subject5_standard.pkl --robot example/robots/booster_t1/T1_23dof.xml
+```
+
 ### 使用示例数据体验
 ```bash
 # 克隆仓库
@@ -161,6 +167,18 @@ Robot Motion Player设计支持与以下项目集成：
 | [Pinocchio](https://github.com/stack-of-tasks/pinocchio) | IK后端（可选） |
 
 ---
+
+## ❓ 常见问题解答
+### Q1: 安装时出现 Pinocchio 相关错误？
+A: 推荐先使用 Conda 安装 Pinocchio：`conda install -c conda-forge pinocchio`，再执行 `pip install`。Windows 用户使用这种方式可以完全避免编译错误。
+### Q2: 运行时提示找不到动作/机器人文件？
+A: 请确保你在克隆的仓库根目录下运行命令，或者为 `--motion` 和 `--robot` 参数使用绝对路径。
+### Q3: GUI 启动失败或显示黑屏？
+A: 确保你的系统支持 OpenGL 3.3+。无桌面的服务器环境可以使用 `xvfb-run` 在虚拟显示器中运行 GUI 命令：`xvfb-run motion_player gui ...`
+### Q4: 导出视频/GIF失败？
+A: 需要安装系统依赖：导出视频需要 `ffmpeg`，导出GIF需要 `imagemagick`。
+### Q5: Windows 环境下中文路径报错？
+A: 将仓库移动到不包含中文的路径下，或者升级 Python 版本到 3.11+。
 
 ## 引用
 如果您在研究中使用了Robot Motion Player，请引用：
