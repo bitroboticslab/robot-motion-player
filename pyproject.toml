@@ -66,9 +66,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Mr-tooth/robot-motion-player"
-Issues = "https://github.com/Mr-tooth/robot-motion-player/issues"
-Documentation = "https://github.com/Mr-tooth/robot-motion-player/blob/main/docs/design.md"
+Homepage = "https://github.com/bitroboticslab/robot-motion-player"
+Issues = "https://github.com/bitroboticslab/robot-motion-player/issues"
+Documentation = "https://github.com/bitroboticslab/robot-motion-player/blob/main/README.md"
 
 [project.scripts]
 motion_player = "motion_player.cli.main:main"

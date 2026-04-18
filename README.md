@@ -3,12 +3,16 @@
 
   # Robot Motion Player
 
-  **Visualize • Tune • Validate Robot Motion Data**
+  **Visualise • Tune • Validate Robot Motion Data**
 
+  [![CI Status][ci-badge]][ci-url]
   [![License][license-badge]](LICENSE)
   [![Python][python-badge]](https://www.python.org/)
+  [![GitHub Stars][star-badge]][star-url]
+  [![GitHub Forks][fork-badge]][fork-url]
+  [![Contributors][contrib-badge]][contrib-url]
 
-  [English](README.md) | [中文](docs/QUICKSTART_zh.md)
+  [English](README.md) | [中文](README_zh.md)
 </div>
 
 ---
@@ -72,21 +76,25 @@ Robot Motion Player is a standalone, cross-platform Python tool for visualizing,
 
 ---
 
-## Installation
+## 📦 Installation
+> PyPI packages are pending approval, source installation is recommended for now:
 
-### Quick Install (Coming soon)
-
-For most users, install via `pip`:
-
+### User Installation (Direct Usage)
 ```bash
-# Core + MuJoCo
-pip install robot-motion-player[mujoco]
+git clone https://github.com/bitroboticslab/robot-motion-player.git
+cd robot-motion-player
+pip install ".[all]"
+```
 
-# With GUI support
-pip install robot-motion-player[mujoco,gui]
-
-# Full features (including IK)
-pip install robot-motion-player[all]
+### Developer Installation (For Contributors)
+```bash
+git clone https://github.com/bitroboticslab/robot-motion-player.git
+cd robot-motion-player
+conda create -n rmp python=3.11 -y
+conda activate rmp
+conda install -c conda-forge pinocchio
+pip install -e ".[all,dev]"
+pre-commit install
 ```
 
 ### From Scripts (Linux, macOS, Windows)
@@ -119,6 +127,12 @@ pip install -e ".[all]"
 ```
 
 ## Quick Start
+### 🚀 2-Line Quick Run
+```bash
+git clone https://github.com/bitroboticslab/robot-motion-player.git && cd robot-motion-player
+pip install ".[all]" && motion_player gui --motion example/standard_dataset/run1_subject5_standard.pkl --robot example/robots/booster_t1/T1_23dof.xml
+```
+
 
 ### Try with Example Data
 
@@ -148,7 +162,7 @@ motion_player metrics \
 ## Documentation
 
 - 📖 [Quick Start Guide](docs/QUICKSTART_en.md)
-- 📖 [快速上手](docs/QUICKSTART_zh.md)
+- 📖 [Chinese Quick Start Guide](docs/QUICKSTART_zh.md)
 - 📖 [IK Usage Guide](docs/IK_USAGE.md)
 
 ---
@@ -164,6 +178,18 @@ Robot Motion Player is designed to integrate with:
 | [Pinocchio](https://github.com/stack-of-tasks/pinocchio) | IK backend (optional) |
 
 ---
+
+## ❓ Frequently Asked Questions
+### Q1: Installation fails with Pinocchio related errors?
+A: We recommend using Conda to install Pinocchio first: `conda install -c conda-forge pinocchio` before running `pip install`. For Windows users, this avoids compilation errors entirely.
+### Q2: Runtime error "file not found" for motion/robot files?
+A: Make sure you are running the command from the root of the cloned repository, or use absolute paths for the `--motion` and `--robot` parameters.
+### Q3: GUI fails to start or shows black screen?
+A: Ensure you have OpenGL 3.3+ support. For headless servers, use `xvfb-run` to run GUI commands in virtual display: `xvfb-run motion_player gui ...`
+### Q4: Video/GIF export fails?
+A: Install required system dependency: `ffmpeg` (required for video export). GIF export uses built-in PIL library and has no extra system dependencies.
+### Q5: Chinese path errors on Windows?
+A: Move the repository to a path without Chinese characters, or upgrade your Python version to 3.11+.
 
 ## Citing
 
@@ -200,5 +226,13 @@ Built upon the shoulders of:
 - [GMR](https://github.com/YanjieZe/GMR) — Motion retargeting
 
 <!-- Links -->
+[ci-badge]: https://github.com/bitroboticslab/robot-motion-player/actions/workflows/ci.yml/badge.svg
+[ci-url]: https://github.com/bitroboticslab/robot-motion-player/actions/workflows/ci.yml
+[star-badge]: https://img.shields.io/github/stars/bitroboticslab/robot-motion-player
+[star-url]: https://github.com/bitroboticslab/robot-motion-player/stargazers
+[fork-badge]: https://img.shields.io/github/forks/bitroboticslab/robot-motion-player
+[fork-url]: https://github.com/bitroboticslab/robot-motion-player/network/members
+[contrib-badge]: https://img.shields.io/github/contributors/bitroboticslab/robot-motion-player
+[contrib-url]: https://github.com/bitroboticslab/robot-motion-player/graphs/contributors
 [license-badge]: https://img.shields.io/badge/License-Apache%202.0-blue.svg
 [python-badge]: https://img.shields.io/badge/Python-3.9%2B-blue
