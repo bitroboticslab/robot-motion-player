@@ -149,6 +149,7 @@ motion_player metrics \
 - [快速上手指南](docs/QUICKSTART_zh.md)
 - [IK使用指南](docs/IK_USAGE.md)
 
+- 📚 [详细中文快速上手指南](docs/QUICKSTART_zh.md)
 ---
 
 ## 生态集成
